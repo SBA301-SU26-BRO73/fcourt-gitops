@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 # Entry point for the dev cluster (bootstrap/dev/root-app.yaml points here).
-# Sync waves: AppProjects -1, platform Applications 0, services ApplicationSet 1.
+# Sync waves: AppProjects -1, platform Applications 0, Eureka 1, services 2, gateway 3.
 resources:
   # AppProjects
   - ../../projects
@@ -15,7 +15,9 @@ resources:
   - ../../platform/dev-data/strimzi
   - ../../platform/dev-data/redis
   # Application services (services/*/overlays/dev)
+  - eureka-appset.yaml
   - services-appset.yaml
+  - gateway-appset.yaml
 patches:
   # DEV ONLY: let the platform AppProject install the in-cluster data components
   - path: platform-project-dev.patch.yaml

@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 # Entry point for the prod cluster (bootstrap/prod/root-app.yaml points here).
-# Sync waves: AppProjects -1, platform Applications 0, services ApplicationSet 1.
+# Sync waves: AppProjects -1, platform Applications 0, Eureka 1, services 2, gateway 3.
 # No in-cluster data components: prod uses RDS, MSK and ElastiCache.
 resources:
   # AppProjects
@@ -12,4 +12,6 @@ resources:
   - ../../platform/external-secrets
   - ../../platform/metrics-server
   # Application services (services/*/overlays/prod)
+  - eureka-appset.yaml
   - services-appset.yaml
+  - gateway-appset.yaml

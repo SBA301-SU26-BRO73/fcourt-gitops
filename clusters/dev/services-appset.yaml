@@ -4,7 +4,7 @@ metadata:
   name: fcourt-services-dev
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: '1'
+    argocd.argoproj.io/sync-wave: '2'
 spec:
   generators:
     - git:
@@ -12,6 +12,10 @@ spec:
         revision: main
         directories:
           - path: services/*/overlays/dev
+          - path: services/eureka-server/overlays/dev
+            exclude: true
+          - path: services/gateway-service/overlays/dev
+            exclude: true
   template:
     metadata:
       name: 'fcourt-{{path[1]}}-dev'
