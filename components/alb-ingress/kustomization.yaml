@@ -3,7 +3,7 @@ kind: Component
 # Public ALB Ingress (shared group "fcourt-public") for a service that uses the
 # spring-service component. Name and backend port come from the service's
 # ConfigMap (label app.kubernetes.io/name and SERVER_PORT); the service base
-# must patch the public path:
+# must patch the public path(s) (add more paths with an "add" + "copy backend from paths/0" pair, see services/booking-service):
 #   patches:
 #     - target: {kind: Ingress}
 #       patch: |-

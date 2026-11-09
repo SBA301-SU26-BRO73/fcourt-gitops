@@ -4,7 +4,21 @@ resources:
   - configmap.yaml
 components:
   - ../../../components/spring-service
+  - ../../../components/alb-ingress
 images:
   - name: spring-service
     newName: <ECR_REGISTRY>/fcourt/slot-hold-engine
     newTag: dev
+patches:
+  - target:
+      kind: Ingress
+    patch: |-
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1group.order
+        value: "10"
+      - op: replace
+        path: /spec/rules/0/http/paths/0/path
+        value: /api/bookings/hold-slots
+      - op: replace
+        path: /spec/rules/0/http/paths/0/pathType
+        value: Prefix

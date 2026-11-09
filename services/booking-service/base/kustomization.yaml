@@ -14,6 +14,27 @@ patches:
   - target:
       kind: Ingress
     patch: |-
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1group.order
+        value: "20"
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1target-group-attributes
+        value: deregistration_delay.timeout_seconds=60
       - op: replace
         path: /spec/rules/0/http/paths/0/path
         value: /api/bookings
+      - op: replace
+        path: /spec/rules/0/http/paths/0/pathType
+        value: Prefix
+      - op: add
+        path: /spec/rules/0/http/paths/-
+        value: {path: /api/admin/bookings, pathType: Prefix}
+      - op: copy
+        from: /spec/rules/0/http/paths/0/backend
+        path: /spec/rules/0/http/paths/1/backend
+      - op: add
+        path: /spec/rules/0/http/paths/-
+        value: {path: /ws-fcourt, pathType: Prefix}
+      - op: copy
+        from: /spec/rules/0/http/paths/0/backend
+        path: /spec/rules/0/http/paths/2/backend

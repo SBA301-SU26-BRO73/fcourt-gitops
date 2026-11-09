@@ -4,9 +4,58 @@ resources:
   - configmap.yaml
 components:
   - ../../../components/spring-service
+  - ../../../components/alb-ingress
 images:
   - name: spring-service
     newName: <ECR_REGISTRY>/fcourt/staff-operations-service
     newTag: dev
 patches:
   - path: deployment-env.yaml
+  - target:
+      kind: Ingress
+    patch: |-
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1group.order
+        value: "10"
+      - op: replace
+        path: /spec/rules/0/http/paths/0/path
+        value: /api/staff/schedule
+      - op: replace
+        path: /spec/rules/0/http/paths/0/pathType
+        value: Prefix
+      - op: add
+        path: /spec/rules/0/http/paths/-
+        value: {path: /api/staff/check-in, pathType: Prefix}
+      - op: copy
+        from: /spec/rules/0/http/paths/0/backend
+        path: /spec/rules/0/http/paths/1/backend
+      - op: add
+        path: /spec/rules/0/http/paths/-
+        value: {path: /api/staff/offline, pathType: Prefix}
+      - op: copy
+        from: /spec/rules/0/http/paths/0/backend
+        path: /spec/rules/0/http/paths/2/backend
+      - op: add
+        path: /spec/rules/0/http/paths/-
+        value: {path: /api/staff/me, pathType: Prefix}
+      - op: copy
+        from: /spec/rules/0/http/paths/0/backend
+        path: /spec/rules/0/http/paths/3/backend
+      - op: add
+        path: /spec/rules/0/http/paths/-
+        value: {path: /api/staff/walk-in, pathType: Prefix}
+      - op: copy
+        from: /spec/rules/0/http/paths/0/backend
+        path: /spec/rules/0/http/paths/4/backend
+      - op: add
+        path: /spec/rules/0/http/paths/-
+        value: {path: /api/staff/bookings, pathType: Prefix}
+      - op: copy
+        from: /spec/rules/0/http/paths/0/backend
+        path: /spec/rules/0/http/paths/5/backend
+      - op: add
+        path: /spec/rules/0/http/paths/-
+        value: {path: /api/admin/staff, pathType: Prefix}
+      - op: copy
+        from: /spec/rules/0/http/paths/0/backend
+        path: /spec/rules/0/http/paths/6/backend

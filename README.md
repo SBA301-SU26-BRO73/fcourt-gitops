@@ -121,22 +121,40 @@ Images are `<ECR_REGISTRY>/fcourt/<service>:<tag>`. CI builds with an immutable 
 
 ## Public routes and assumptions
 
-Ingress paths follow the backend controller mappings. Services without an Ingress are ClusterIP only; whether they should be exposed has not been verified.
+Every service that has public REST endpoints has its own Ingress in the shared ALB group `fcourt-public`, so web and mobile clients use one host. Paths come from the controller mappings in `fcourt-backend` (branch `dev`) plus `/devices` from the open `work-push-device-registry` branch. Never routed: `/api/internal/**` (service-to-service), `/actuator/**` (the ALB only health-checks `/actuator/health` on the pod), `/.well-known/jwks.json` (consumed by services inside the cluster), and the slot-hold-engine gRPC server (not in the Service or any Ingress).
 
-| Service | Port | Public prefix |
+| Path | Service | Port |
 |---|---|---|
-| auth-service | 8081 | `/api/auth` |
-| subscription-service | 8082 | `/api/subscriptions` |
-| facility-service | 8083 | none |
-| reporting-service | 8084 | none |
-| discovery-service | 8085 | none |
-| voucher-service | 8086 | `/api/vouchers` |
-| slot-hold-engine | 8087 | none |
-| booking-service | 8088 | `/api/bookings` |
-| payment-service | 8089 | `/api/payments` |
-| staff-operations-service | 8090 | none |
-| notification-service | 8091 | `/devices` |
-| pos-retail-service | 8092 | none |
+| `/api/auth` (also `/api/auth/me`, `/profile`, `/password`) | auth-service | 8081 |
+| `/api/super-admin/court-admins`, `/api/super-admin/users`, `/api/super-admin/stats/accounts`, `/api/super-admin/stats/owner-names` | auth-service | 8081 |
+| `/api/subscriptions`, `/api/subscription-plans`, `/api/court-types`, `/api/super-admin/stats/saas-revenue` | subscription-service | 8082 |
+| `/api/public/branches/*` (branch detail, `/images`, `/courts`), `/api/admin/branches`, `/api/admin/courts`, `/api/admin/time-slot-templates`, `/api/staff/branches`, `/api/staff/courts` | facility-service | 8083 |
+| `/api/admin/dashboard`, `/api/super-admin/dashboard` | reporting-service | 8084 |
+| `/api/public/branches` (exact, list), `/api/public/branches/*/reviews`, `/api/public/courts`, `/api/reviews`, `/api/admin/reviews` | discovery-service | 8085 |
+| `/api/vouchers`, `/api/admin/vouchers` | voucher-service | 8086 |
+| `/api/bookings/hold-slots` (REST only; gRPC stays private) | slot-hold-engine | 8087 |
+| `/api/bookings`, `/api/admin/bookings`, `/ws-fcourt` (WebSocket/STOMP) | booking-service | 8088 |
+| `/api/payments`, `/api/refunds`, `/api/admin/payments`, `/api/admin/refunds` | payment-service | 8089 |
+| `/api/staff/schedule`, `/api/staff/check-in`, `/api/staff/offline`, `/api/staff/me`, `/api/staff/walk-in`, `/api/staff/bookings`, `/api/admin/staff` | staff-operations-service | 8090 |
+| `/devices` | notification-service | 8091 |
+| `/api/staff/pos`, `/api/admin/pos` | pos-retail-service | 8092 |
+
+### Path precedence
+
+The ALB picks the first matching rule by priority, not the longest prefix. The AWS Load Balancer Controller orders rules in a group by `alb.ingress.kubernetes.io/group.order` (lower first), then by Ingress namespace/name, then by path order inside the Ingress. Two overlaps exist and are resolved with that order:
+
+- `/api/bookings` (booking-service, order 20) contains `/api/bookings/hold-slots` (slot-hold-engine, order 10). The hold-engine Ingress is evaluated first.
+- `/api/public/branches/*` (facility-service, order 20) contains `/api/public/branches/{id}/reviews` (discovery-service, order 10), and discovery also owns the exact list path `/api/public/branches`. Discovery is evaluated first; the facility wildcard does not match the bare list path.
+
+Everything else is disjoint on purpose: `/api/admin/*`, `/api/staff/*` and `/api/super-admin/*` are split by the second segment (for example `/api/admin/branches` vs `/api/admin/dashboard`), so no broad `/api/admin` or `/api/staff` prefix is used. Keep new paths specific and give any path that sits inside another service's prefix a lower `group.order`.
+
+The ALB default limit is 100 rules; the 12 Ingresses currently use about 45.
+
+### WebSocket (`/ws-fcourt`)
+
+booking-service serves STOMP over plain WebSocket (no SockJS fallback, so sticky sessions are not needed; slot updates fan out through Redis pub/sub). ALB upgrades WebSocket connections on its HTTP listeners without extra annotations. The component sets `load-balancer-attributes: idle_timeout.timeout_seconds=3600` (default is 60 s, and the server sends no heartbeats), and the booking Ingress sets `target-group-attributes: deregistration_delay.timeout_seconds=60` to let sockets drain on rollouts. Clients should still reconnect on close.
+
+### Assumptions
 
 - `pos-retail-service` and `notification-service` both default to `8091` in code. The POS manifest sets `SERVER_PORT` to `8092` to avoid the clash.
 - Secrets are referenced by name only. External Secrets is installed as an operator, but no SecretStore or ExternalSecret exists yet.

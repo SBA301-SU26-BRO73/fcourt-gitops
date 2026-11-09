@@ -4,9 +4,28 @@ resources:
   - configmap.yaml
 components:
   - ../../../components/spring-service
+  - ../../../components/alb-ingress
 images:
   - name: spring-service
     newName: <ECR_REGISTRY>/fcourt/reporting-service
     newTag: dev
 patches:
   - path: deployment-env.yaml
+  - target:
+      kind: Ingress
+    patch: |-
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1group.order
+        value: "10"
+      - op: replace
+        path: /spec/rules/0/http/paths/0/path
+        value: /api/admin/dashboard
+      - op: replace
+        path: /spec/rules/0/http/paths/0/pathType
+        value: Prefix
+      - op: add
+        path: /spec/rules/0/http/paths/-
+        value: {path: /api/super-admin/dashboard, pathType: Prefix}
+      - op: copy
+        from: /spec/rules/0/http/paths/0/backend
+        path: /spec/rules/0/http/paths/1/backend
