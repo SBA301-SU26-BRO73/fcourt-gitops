@@ -1,6 +1,6 @@
 # FCourt GitOps
 
-Kubernetes configuration that Argo CD syncs to the FCourt EKS clusters (dev and prod): 12 Spring Boot services plus the platform add-ons they need. Kustomize everywhere; Helm charts are installed by Argo CD Applications with pinned versions.
+Kubernetes configuration that Argo CD syncs to the FCourt EKS clusters (dev and prod): 12 Spring Boot services, the Spring Cloud pair (`eureka-server` registry and `gateway-service`, the only public entry point) and the platform add-ons they need. Kustomize everywhere; Helm charts are installed by Argo CD Applications with pinned versions.
 
 Repository split (see `docs/adr/0001-three-repositories.md`): the backend repo holds source code and image CI, `fcourt-infra` (Terraform) creates EKS, networking, IAM, Pod Identity associations and the prod managed data services, and this repo holds manifests and the image tag in each overlay. No real secrets are stored in Git.
 
@@ -29,7 +29,7 @@ platform/
     redis/                     #   redis-application.yaml, manifests/
 components/
   spring-service/              # shared Deployment, Service, ServiceAccount, probes, resources, security context
-  alb-ingress/                 # shared public ALB Ingress (group fcourt-public)
+  alb-ingress/                 # public ALB Ingress (group fcourt-public); used only by gateway-service
 services/<service>/
   base/                        # configmap.yaml, kustomization.yaml, optional deployment-env.yaml
   overlays/dev/                # namespace fcourt-dev, image tag, replicas
@@ -54,10 +54,12 @@ The root Application syncs `clusters/<env>`, which contains everything Argo CD n
 fcourt-root (path clusters/<env>)
   |- wave -1  AppProjects (platform, services)
   |- wave  0  platform Applications (add-ons; in dev also operators and in-cluster data)
-  '- wave  1  services ApplicationSet -> one Application per services/*/overlays/<env>
+  |- wave  1  eureka-server ApplicationSet  -> fcourt-eureka-server-<env>
+  |- wave  2  services ApplicationSet       -> one Application per services/*/overlays/<env> (eureka-server and gateway-service excluded)
+  '- wave  3  gateway-service ApplicationSet -> fcourt-gateway-service-<env>
 ```
 
-Argo CD waits for the wave 0 Applications to be healthy before it creates the ApplicationSet. The ApplicationSet does not wait for the Applications it generates, so service Apps reconcile concurrently. Retry with bounded backoff is set on the root and all child Applications. In dev, the CloudNativePG and Strimzi instance Applications use `SkipDryRunOnMissingResource=true` so their custom resources are accepted before the operator CRDs exist.
+Argo CD waits for the wave 0 Applications to be healthy before it creates the ApplicationSets. An ApplicationSet does not wait for the Applications it generates, so the ordering eureka, services, gateway is best effort: the ApplicationSets are created in that order, but the Apps still reconcile concurrently. It is safe anyway: Eureka clients and the gateway retry registration and refresh the registry, and the 5-minute `startupProbe` covers a slow Eureka start. Retry with bounded backoff is set on the root and all child Applications. In dev, the CloudNativePG and Strimzi instance Applications use `SkipDryRunOnMissingResource=true` so their custom resources are accepted before the operator CRDs exist.
 
 Bring-up order for dev is in "Dev bring-up" below. Pod Identity associations come from `fcourt-infra`.
 
@@ -66,7 +68,7 @@ Bring-up order for dev is in "Dev bring-up" below. Pod Identity associations com
 | | dev | prod |
 |---|---|---|
 | Entry point | `clusters/dev` | `clusters/prod` |
-| Services namespace | `fcourt-dev` (1 replica each) | `fcourt-prod` (2 replicas each) |
+| Services namespace | `fcourt-dev` (1 replica each) | `fcourt-prod` (2 replicas each; `eureka-server` 1, `gateway-service` 2) |
 | PostgreSQL | CloudNativePG in namespace `data` | RDS (Terraform) |
 | Kafka | Strimzi in namespace `data` | MSK (Terraform) |
 | Redis | Deployment in namespace `data` | ElastiCache (Terraform) |
@@ -97,19 +99,19 @@ kubectl -n data port-forward svc/fcourt-kafka-kafka-bootstrap 9092:9092
 
 ## How a service is built
 
-`components/spring-service` holds the Deployment, Service and ServiceAccount shared by all services: non-root user, read-only root filesystem, `/tmp` emptyDir, `/actuator/health` probes, resource requests and limits. It uses placeholder names and fills them in from the service's own ConfigMap with Kustomize replacements: the `app.kubernetes.io/name` label gives every resource name and selector, `metadata.name` gives the `envFrom` reference, and `SERVER_PORT` gives the container and Service port. `components/alb-ingress` does the same for the public Ingress.
+`components/spring-service` holds the Deployment, Service and ServiceAccount shared by all services: non-root user, read-only root filesystem, `/tmp` emptyDir, `/actuator/health` probes, resource requests and limits. It uses placeholder names and fills them in from the service's own ConfigMap with Kustomize replacements: the `app.kubernetes.io/name` label gives every resource name and selector, `metadata.name` gives the `envFrom` reference, and `SERVER_PORT` gives the container and Service port. `components/alb-ingress` does the same for the one public Ingress, which only `gateway-service` uses; every other service is ClusterIP-only.
 
 A service base therefore contains only what is specific to it:
 
 - `configmap.yaml`: `<service>-config`, labelled `app.kubernetes.io/name: <service>`, with `SERVER_PORT` and the Spring environment variables.
 - `deployment-env.yaml` (optional): `env` entries that reference Secrets.
-- `kustomization.yaml`: the components, the image name, and for public services the Ingress path.
+- `kustomization.yaml`: the components, the image name. Only gateway-service also has `components/alb-ingress`.
 
 ## Add a service
 
 1. Create `services/<service>/base/configmap.yaml`, named `<service>-config`, with label `app.kubernetes.io/name: <service>`, `SERVER_PORT` and the variables from the service's `application.yml`. Pick a port no other service uses.
 2. If the service needs secrets, add `services/<service>/base/deployment-env.yaml` (copy one from an existing service). Secrets are Kubernetes Secrets named `<service>-secrets`.
-3. Create `services/<service>/base/kustomization.yaml` (copy an existing one). Change the image `newName` to `870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/<service>`. Keep `components/alb-ingress` and the Ingress path patch only if the API is public.
+3. Create `services/<service>/base/kustomization.yaml` (copy an existing one). Change the image `newName` to `870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/<service>`. Do not add an Ingress: the service is reached through the gateway. Add its route (path to `lb://<eureka-name>`) in `gateway-service` in fcourt-backend and to the table below, and set `EUREKA_URL`, `EUREKA_ENABLED=true`, `EUREKA_INSTANCE_PREFER_IP_ADDRESS=true` in the ConfigMap.
 4. Create `services/<service>/overlays/dev/kustomization.yaml` and `overlays/prod/kustomization.yaml` (copy an existing pair and replace the service name).
 5. Run `bash scripts/validate.sh`.
 
@@ -119,9 +121,16 @@ No other registration is needed: the ApplicationSets discover `services/*/overla
 
 Images are `870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/<service>:<tag>`; the repositories live in `fcourt-infra/envs/shared` and survive dev teardowns. `overlays/dev` starts on the moving tag `dev`. CI (fcourt-backend, workflow `build-push-images.yml`) pushes `:<short-sha>` and `:dev`, then runs `kustomize edit set image <repo>=<repo>:<short-sha>` in `services/<service>/overlays/dev` and commits to `main`; Argo CD syncs the new commit. Prod overlays keep `<IMAGE_TAG>` until prod is enabled. Never use `latest`.
 
-## Public routes and assumptions
+## Traffic flow, gateway routes and assumptions
 
-Every service that has public REST endpoints has its own Ingress in the shared ALB group `fcourt-public`, so web and mobile clients use one host. Paths come from the controller mappings in `fcourt-backend` (branch `dev`) plus `/devices` from the open `work-push-device-registry` branch. Never routed: `/api/internal/**` (service-to-service), `/actuator/**` (the ALB only health-checks `/actuator/health` on the pod), `/.well-known/jwks.json` (consumed by services inside the cluster), and the slot-hold-engine gRPC server (not in the Service or any Ingress).
+```text
+client -> ALB (group fcourt-public, HTTP 80) -> gateway-service:8080 -> Eureka lookup (lb://<name>) -> pod IP of the target service
+```
+
+`gateway-service` owns the only Ingress (path `/`, Prefix). It checks the JWT (JWKS from `auth-service`, same `AUTH_JWK_SET_URI`, `AUTH_JWT_ISSUER` and `AUTH_JWT_AUDIENCE` as the other services), then routes by path through Eureka `lb://` to the target service. Every other service is ClusterIP-only and is never reachable from outside the cluster. `eureka-server` (port 8761, one replica) is ClusterIP too; open its dashboard with `kubectl -n fcourt-dev port-forward svc/eureka-server 8761:8761`. All services register with `EUREKA_URL=http://eureka-server:8761/eureka`, `EUREKA_ENABLED=true` and `EUREKA_INSTANCE_PREFER_IP_ADDRESS=true` (pod IP, because pod hostnames do not resolve). The aggregated Swagger UI is served by the gateway at `/swagger-ui`.
+
+The table below is the routing reference the gateway implements (it was the per-service Ingress table before the gateway). Paths come from the controller mappings in `fcourt-backend` plus `/devices`. Never routed: `/api/internal/**` (service-to-service), `/actuator/**` on other services (the ALB only health-checks the gateway's own `/actuator/health`), `/.well-known/jwks.json` (consumed by services inside the cluster), and the slot-hold-engine gRPC server.
+
 
 | Path | Service | Port |
 |---|---|---|
@@ -141,18 +150,18 @@ Every service that has public REST endpoints has its own Ingress in the shared A
 
 ### Path precedence
 
-The ALB picks the first matching rule by priority, not the longest prefix. The AWS Load Balancer Controller orders rules in a group by `alb.ingress.kubernetes.io/group.order` (lower first), then by Ingress namespace/name, then by path order inside the Ingress. Two overlaps exist and are resolved with that order:
+Spring Cloud Gateway evaluates routes in `order` and takes the first match, not the longest prefix, so the gateway routes must keep the same precedence the ALB groups had. Two overlaps exist:
 
-- `/api/bookings` (booking-service, order 20) contains `/api/bookings/hold-slots` (slot-hold-engine, order 10). The hold-engine Ingress is evaluated first.
-- `/api/public/branches/*` (facility-service, order 20) contains `/api/public/branches/{id}/reviews` (discovery-service, order 10), and discovery also owns the exact list path `/api/public/branches`. Discovery is evaluated first; the facility wildcard does not match the bare list path.
+- `/api/bookings` (booking-service) contains `/api/bookings/hold-slots` (slot-hold-engine). The hold-slots route must come first.
+- `/api/public/branches/*` (facility-service) contains `/api/public/branches/{id}/reviews` (discovery-service), and discovery also owns the exact list path `/api/public/branches`. The discovery routes must come first; the facility wildcard does not match the bare list path.
 
-Everything else is disjoint on purpose: `/api/admin/*`, `/api/staff/*` and `/api/super-admin/*` are split by the second segment (for example `/api/admin/branches` vs `/api/admin/dashboard`), so no broad `/api/admin` or `/api/staff` prefix is used. Keep new paths specific and give any path that sits inside another service's prefix a lower `group.order`.
+Everything else is disjoint on purpose: `/api/admin/*`, `/api/staff/*` and `/api/super-admin/*` are split by the second segment (for example `/api/admin/branches` vs `/api/admin/dashboard`), so no broad `/api/admin` or `/api/staff` prefix is used. Keep new paths specific.
 
-The ALB default limit is 100 rules; the 12 Ingresses currently use about 45.
+The ALB now has a single rule (`/` to the gateway), far below its 100-rule default limit.
 
 ### WebSocket (`/ws-fcourt`)
 
-booking-service serves STOMP over plain WebSocket (no SockJS fallback, so sticky sessions are not needed; slot updates fan out through Redis pub/sub). ALB upgrades WebSocket connections on its HTTP listeners without extra annotations. The component sets `load-balancer-attributes: idle_timeout.timeout_seconds=3600` (default is 60 s, and the server sends no heartbeats), and the booking Ingress sets `target-group-attributes: deregistration_delay.timeout_seconds=60` to let sockets drain on rollouts. Clients should still reconnect on close.
+booking-service serves STOMP over plain WebSocket (no SockJS fallback, so sticky sessions are not needed; slot updates fan out through Redis pub/sub). The gateway must route `/ws-fcourt` to `lb:ws://booking-service` (WebSocket upgrade through Spring Cloud Gateway). The ALB upgrades WebSocket connections on its HTTP listeners without extra annotations. The gateway Ingress sets `load-balancer-attributes: idle_timeout.timeout_seconds=3600` (default is 60 s, and the server sends no heartbeats) and `target-group-attributes: deregistration_delay.timeout_seconds=60` to let sockets drain on rollouts. Clients should still reconnect on close.
 
 ### Assumptions
 
@@ -179,3 +188,7 @@ Run from this repo with `AWS_PROFILE=tpn12`, `kubectl` pointed at the new cluste
 4. Watch `kubectl -n argocd get applications`. `platform/storage` creates the default `gp3` StorageClass (EBS CSI, `reclaimPolicy: Delete`); the EBS CSI add-on and its Pod Identity role come from `fcourt-infra/modules/eks`.
 
 Values still to be chosen by the owner before services are healthy: `NOTIFICATION_SMTP_HOST` and `NOTIFICATION_RESET_PASSWORD_URL` in `services/notification-service/base/configmap.yaml` (left as `<SET_...>`), `PAYOS_RETURN_URL` and `PAYOS_CANCEL_URL` (empty). Service-to-service URLs use short in-namespace names (`http://auth-service:8081`), and `AUTH_JWT_ISSUER` is the string `http://auth-service:8081` for every service (it only has to be identical everywhere). Service pods request 448Mi (limit 768Mi), start with a 5-minute `startupProbe` and `JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60`.
+
+### Dev memory budget (2 x t3.large, about 13.9 GiB allocatable)
+
+Requests set in Git: 12 services x 448Mi + `eureka-server` 384Mi + `gateway-service` 448Mi = 6208Mi; PostgreSQL 512Mi, Kafka 512Mi, Redis 96Mi = 1120Mi; Argo CD (controller, server, repo-server, redis) 480Mi. That is 7808Mi (about 7.6 GiB). Add roughly 1.4 GiB for pods without a request (operators, entity operator, External Secrets, ALB controller, metrics-server, kube-system) and the scheduler sees about 9.0 GiB of 13.9 GiB. Actual use is higher than requests (JVMs run at 450-600Mi), roughly 11.5-13.5 GiB, so watch `kubectl top nodes` and keep the node count at 2 or more.
