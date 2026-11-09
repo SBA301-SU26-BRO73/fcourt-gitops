@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fcourt-postgres-init
+  namespace: data
+  annotations:
+    argocd.argoproj.io/sync-wave: '1'
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: init
+          image: ghcr.io/cloudnative-pg/postgresql:16.4
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              until pg_isready -h fcourt-postgres-rw -U postgres; do sleep 3; done
+              psql -h fcourt-postgres-rw -U postgres -d postgres -f /scripts/init.sql
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: fcourt-postgres-superuser
+                  key: password
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: scripts
+          configMap:
+            name: fcourt-postgres-init
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fcourt-postgres-init
+  namespace: data
+data:
+  init.sql: |
+    SELECT 'CREATE DATABASE auth_db OWNER postgres' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'auth_db')\gexec
+    SELECT 'CREATE DATABASE booking_db OWNER postgres' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'booking_db')\gexec
+    SELECT 'CREATE DATABASE discovery_db OWNER postgres' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'discovery_db')\gexec
+    SELECT 'CREATE DATABASE facility_db OWNER postgres' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'facility_db')\gexec
+    SELECT 'CREATE DATABASE notification_db OWNER postgres' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'notification_db')\gexec
+    SELECT 'CREATE DATABASE payment_db OWNER postgres' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'payment_db')\gexec
+    SELECT 'CREATE DATABASE pos_retail_db OWNER postgres' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'pos_retail_db')\gexec
+    SELECT 'CREATE DATABASE reporting_db OWNER postgres' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'reporting_db')\gexec
+    SELECT 'CREATE DATABASE staff_db OWNER postgres' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'staff_db')\gexec
+    SELECT 'CREATE DATABASE subscription_db OWNER postgres' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'subscription_db')\gexec
+    SELECT 'CREATE DATABASE voucher_db OWNER postgres' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'voucher_db')\gexec

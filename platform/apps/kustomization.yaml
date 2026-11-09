@@ -4,3 +4,8 @@ resources:
   - aws-load-balancer-controller
   - external-secrets
   - metrics-server
+  - cloudnative-pg-operator
+  - cloudnative-pg
+  - strimzi-operator
+  - strimzi
+  - redis

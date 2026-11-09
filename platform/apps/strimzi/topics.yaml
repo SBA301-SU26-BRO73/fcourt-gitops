@@ -1,0 +1,143 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: fcourt-auth-events
+  namespace: data
+  labels:
+    strimzi.io/cluster: fcourt-kafka
+spec:
+  topicName: fcourt.auth.events
+  partitions: 1
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: fcourt-auth-events-dlt
+  namespace: data
+  labels:
+    strimzi.io/cluster: fcourt-kafka
+spec:
+  topicName: fcourt.auth.events.DLT
+  partitions: 1
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: fcourt-payment-events
+  namespace: data
+  labels:
+    strimzi.io/cluster: fcourt-kafka
+spec:
+  topicName: fcourt.payment.events
+  partitions: 1
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: fcourt-payment-events-dlt
+  namespace: data
+  labels:
+    strimzi.io/cluster: fcourt-kafka
+spec:
+  topicName: fcourt.payment.events.DLT
+  partitions: 1
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: fcourt-booking-events
+  namespace: data
+  labels:
+    strimzi.io/cluster: fcourt-kafka
+spec:
+  topicName: fcourt.booking.events
+  partitions: 1
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: fcourt-booking-events-dlt
+  namespace: data
+  labels:
+    strimzi.io/cluster: fcourt-kafka
+spec:
+  topicName: fcourt.booking.events.DLT
+  partitions: 1
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: fcourt-pos-events
+  namespace: data
+  labels:
+    strimzi.io/cluster: fcourt-kafka
+spec:
+  topicName: fcourt.pos.events
+  partitions: 1
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: fcourt-staff-events
+  namespace: data
+  labels:
+    strimzi.io/cluster: fcourt-kafka
+spec:
+  topicName: fcourt.staff.events
+  partitions: 1
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: facility-branch-updated-v1
+  namespace: data
+  labels:
+    strimzi.io/cluster: fcourt-kafka
+spec:
+  topicName: facility.branch-updated.v1
+  partitions: 1
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: fcourt-pos-events-dlt
+  namespace: data
+  labels:
+    strimzi.io/cluster: fcourt-kafka
+spec:
+  topicName: fcourt.pos.events.DLT
+  partitions: 1
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: fcourt-staff-events-dlt
+  namespace: data
+  labels:
+    strimzi.io/cluster: fcourt-kafka
+spec:
+  topicName: fcourt.staff.events.DLT
+  partitions: 1
+  replicas: 1
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: facility-branch-updated-v1-dlt
+  namespace: data
+  labels:
+    strimzi.io/cluster: fcourt-kafka
+spec:
+  topicName: facility.branch-updated.v1.DLT
+  partitions: 1
+  replicas: 1
