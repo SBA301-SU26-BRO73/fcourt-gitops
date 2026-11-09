@@ -11,9 +11,6 @@ data:
   DISCOVERY_DB_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/discovery_db"
   DISCOVERY_DB_USER: 'postgres'
   KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
-  STORAGE_PROVIDER: 'cloudinary'
-  STORAGE_PUBLIC_BASE_URL: ''
-  CLOUDINARY_CLOUD_NAME: ''
   AUTH_JWK_SET_URI: 'http://auth-service:8081/.well-known/jwks.json'
   AUTH_JWT_ISSUER: 'http://auth-service:8081'
   AUTH_JWT_AUDIENCE: 'fcourt'
@@ -28,6 +25,9 @@ data:
   BOOKING_URL: 'http://booking-service:8088'
   DISCOVERY_CACHE_TTL_SECONDS: '5'
   BRANCH_UPDATED_TOPIC: 'facility.branch-updated.v1'
+  STORAGE_S3_BUCKET: ''
+  STORAGE_S3_REGION: 'ap-southeast-1'
+  STORAGE_PUBLIC_BASE_URL: ''
   EUREKA_URL: 'http://eureka-server:8761/eureka'
   EUREKA_ENABLED: 'true'
   EUREKA_INSTANCE_PREFER_IP_ADDRESS: 'true'
