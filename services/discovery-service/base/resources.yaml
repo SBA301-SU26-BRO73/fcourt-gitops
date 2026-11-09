@@ -142,26 +142,3 @@ spec:
       port: 8085
       targetPort: http
       protocol: TCP
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: discovery-service
-  annotations:
-    alb.ingress.kubernetes.io/group.name: fcourt-public
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/healthcheck-path: /actuator/health
-spec:
-  ingressClassName: alb
-  rules:
-    - http:
-        paths:
-          - path: /api/discovery
-            pathType: Prefix
-            backend:
-              service:
-                name: discovery-service
-                port:
-                  number: 8085
-
