@@ -11,3 +11,11 @@ images:
   - name: spring-service
     newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/gateway-service
     newTag: dev
+patches:
+  - target:
+      kind: Ingress
+    patch: |-
+      # Let WebSocket (/ws-fcourt) connections drain on gateway rollouts.
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1target-group-attributes
+        value: deregistration_delay.timeout_seconds=60
