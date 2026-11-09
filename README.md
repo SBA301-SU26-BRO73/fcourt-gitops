@@ -59,7 +59,7 @@ fcourt-root (path clusters/<env>)
 
 Argo CD waits for the wave 0 Applications to be healthy before it creates the ApplicationSet. The ApplicationSet does not wait for the Applications it generates, so service Apps reconcile concurrently. Retry with bounded backoff is set on the root and all child Applications. In dev, the CloudNativePG and Strimzi instance Applications use `SkipDryRunOnMissingResource=true` so their custom resources are accepted before the operator CRDs exist.
 
-Before the first sync, replace the placeholders: the Git URL (if it changes), `<ECR_REGISTRY>`, `<IMAGE_TAG>`, the `<SET_...>` ConfigMap values, and in `platform/aws-load-balancer-controller/application.yaml` the cluster name, region and VPC ID. Pod Identity associations come from `fcourt-infra`.
+Bring-up order for dev is in "Dev bring-up" below. Pod Identity associations come from `fcourt-infra`.
 
 ## Dev vs prod
 
@@ -109,7 +109,7 @@ A service base therefore contains only what is specific to it:
 
 1. Create `services/<service>/base/configmap.yaml`, named `<service>-config`, with label `app.kubernetes.io/name: <service>`, `SERVER_PORT` and the variables from the service's `application.yml`. Pick a port no other service uses.
 2. If the service needs secrets, add `services/<service>/base/deployment-env.yaml` (copy one from an existing service). Secrets are Kubernetes Secrets named `<service>-secrets`.
-3. Create `services/<service>/base/kustomization.yaml` (copy an existing one). Change the image `newName` to `<ECR_REGISTRY>/fcourt/<service>`. Keep `components/alb-ingress` and the Ingress path patch only if the API is public.
+3. Create `services/<service>/base/kustomization.yaml` (copy an existing one). Change the image `newName` to `870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/<service>`. Keep `components/alb-ingress` and the Ingress path patch only if the API is public.
 4. Create `services/<service>/overlays/dev/kustomization.yaml` and `overlays/prod/kustomization.yaml` (copy an existing pair and replace the service name).
 5. Run `bash scripts/validate.sh`.
 
@@ -117,7 +117,7 @@ No other registration is needed: the ApplicationSets discover `services/*/overla
 
 ## Image updates
 
-Images are `<ECR_REGISTRY>/fcourt/<service>:<tag>`. CI builds with an immutable tag (commit SHA preferred) and sets `images[].newTag` in `services/<service>/overlays/<env>/kustomization.yaml` with `kustomize edit set image`; Argo CD syncs from the new commit. Never use `latest`.
+Images are `870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/<service>:<tag>`; the repositories live in `fcourt-infra/envs/shared` and survive dev teardowns. `overlays/dev` starts on the moving tag `dev`. CI (fcourt-backend, workflow `build-push-images.yml`) pushes `:<short-sha>` and `:dev`, then runs `kustomize edit set image <repo>=<repo>:<short-sha>` in `services/<service>/overlays/dev` and commits to `main`; Argo CD syncs the new commit. Prod overlays keep `<IMAGE_TAG>` until prod is enabled. Never use `latest`.
 
 ## Public routes and assumptions
 
@@ -157,7 +157,7 @@ booking-service serves STOMP over plain WebSocket (no SockJS fallback, so sticky
 ### Assumptions
 
 - `pos-retail-service` and `notification-service` both default to `8091` in code. The POS manifest sets `SERVER_PORT` to `8092` to avoid the clash.
-- Secrets are referenced by name only. External Secrets is installed as an operator, but no SecretStore or ExternalSecret exists yet.
+- Secrets are referenced by name only. In dev they are created by `scripts/create-dev-secrets.sh` (see below); External Secrets is installed as an operator but has no store yet.
 - Confirm that the Actuator health endpoint is present in the built images.
 - Chart versions are pinned but not tested against the clusters. See `platform/README.md`.
 
@@ -168,3 +168,14 @@ bash scripts/validate.sh
 ```
 
 Renders every Kustomize entry point (bootstrap, clusters, platform, every service overlay) with `kustomize` or `kubectl kustomize`. No cluster or AWS access is needed.
+
+## Dev bring-up (after `terraform apply` of `fcourt-infra/envs/dev`)
+
+Run from this repo with `AWS_PROFILE=tpn12`, `kubectl` pointed at the new cluster (`aws eks update-kubeconfig --name fcourt-dev`), `helm` and `terraform` installed.
+
+1. `bash scripts/apply-terraform-outputs.sh` writes the two values only known after apply (VPC id for the AWS Load Balancer Controller, SNS platform application ARN for notification-service) and pushes them to `main`. The controller cannot discover the VPC itself because the node launch template sets IMDS hop limit 1.
+2. `bash scripts/create-dev-secrets.sh --generate` creates namespaces `data` and `fcourt-dev` and every Secret from `~/.fcourt/dev-secrets/<secret>.env` (see `scripts/dev-secrets.example/` for the keys; those files hold keys only). Random values (JWT/gRPC keys, internal tokens, Postgres password) are generated; Cloudinary, PayOS (including `PAYOS_CHECKSUM_KEY`) and SMTP values must be put in the files first. `fcourt-postgres-superuser` is created in `data` (used by CloudNativePG through `superuserSecret`) and copied to `fcourt-dev` (used by the services).
+3. `export GITOPS_REPO_USERNAME=... GITOPS_REPO_TOKEN=...` (fine-grained PAT, Contents read-only on `fcourt-gitops`; never committed), then `bash scripts/bootstrap-argocd.sh`. It installs Argo CD chart `10.13.1` (dex and notifications off, small resources, `argocd/values.yaml`), stores the repo credential as a Secret, demotes the `gp2` default StorageClass and applies the root Application.
+4. Watch `kubectl -n argocd get applications`. `platform/storage` creates the default `gp3` StorageClass (EBS CSI, `reclaimPolicy: Delete`); the EBS CSI add-on and its Pod Identity role come from `fcourt-infra/modules/eks`.
+
+Values still to be chosen by the owner before services are healthy: `NOTIFICATION_SMTP_HOST` and `NOTIFICATION_RESET_PASSWORD_URL` in `services/notification-service/base/configmap.yaml` (left as `<SET_...>`), `PAYOS_RETURN_URL` and `PAYOS_CANCEL_URL` (empty). Service-to-service URLs use short in-namespace names (`http://auth-service:8081`), and `AUTH_JWT_ISSUER` is the string `http://auth-service:8081` for every service (it only has to be identical everywhere). Service pods request 448Mi (limit 768Mi), start with a 5-minute `startupProbe` and `JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60`.
