@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: voucher-service
+spec:
+  template:
+    spec:
+      containers:
+        - name: voucher-service
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: fcourt-postgres-superuser
+                  key: password
+            - name: VOUCHER_GRPC_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: voucher-service-secrets
+                  key: VOUCHER_GRPC_TOKEN
+            - name: VOUCHER_GRPC_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: voucher-service-secrets
+                  key: VOUCHER_GRPC_PRIVATE_KEY

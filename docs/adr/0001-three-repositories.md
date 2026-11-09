@@ -21,12 +21,8 @@ Ba repo cần quy ước chung cho tên service, tag image, biến môi trườn
 
 ## Root sync ordering
 
-The root Application at `bootstrap/root-app.yaml` manages `argocd/`. That Kustomize root includes AppProjects at sync-wave `-1`, the platform add-on Application manifests directly at wave `0`, and the services ApplicationSet at wave `1`. Since Argo CD processes sync waves and waits for wave resources to become healthy before advancing, platform Application health gates creation/sync of the services ApplicationSet. The platform Application CRs are in namespace `argocd`; their chart destinations are their workload namespaces such as `kube-system` and `external-secrets`. Root and child Applications use bounded retry backoff.
+Each cluster has one root Application (`bootstrap/dev/root-app.yaml`, `bootstrap/prod/root-app.yaml`) that manages `clusters/<env>`. That Kustomize entry point includes the AppProjects at sync-wave `-1`, the platform Application manifests directly at wave `0`, and the services ApplicationSet at wave `1`. Argo CD waits for the health of the wave 0 Application resources before advancing, so platform health gates creation of the services ApplicationSet. The platform Application resources live in namespace `argocd`; their chart destinations are workload namespaces such as `kube-system` and `external-secrets`. Root and child Applications use bounded retry backoff.
 
-This orders the resources the root directly manages. An ApplicationSet does not wait for the health of generated Applications; service Applications may reconcile concurrently after generation. Progressive syncs with RollingSync are a possible later option but are not enabled.
+In-cluster data components (CloudNativePG, Strimzi, Redis) are listed only in `clusters/dev`; prod uses managed AWS services provisioned by `fcourt-infra`.
 
-## Root sync ordering
-
-The root Application at `bootstrap/root-app.yaml` manages `argocd/`. That Kustomize root includes AppProjects at sync-wave `-1`, the platform add-on Application manifests directly at wave `0`, and the services ApplicationSet at wave `1`. Argo CD waits for the health of wave 0 Application resources before advancing. The platform Application CRs live in namespace `argocd`; their chart destinations are workload namespaces such as `kube-system` and `external-secrets`. Root and child Applications use bounded retry backoff.
-
-This orders resources the root directly manages. An ApplicationSet does not wait for the health of generated Applications; service Applications may reconcile concurrently. Progressive syncs with RollingSync are a possible later option but are not enabled.
+This orders the resources the root directly manages. An ApplicationSet does not wait for the health of the Applications it generates, so service Applications may reconcile concurrently. Progressive syncs with RollingSync are a possible later option but are not enabled.

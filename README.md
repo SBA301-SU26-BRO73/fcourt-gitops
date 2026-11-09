@@ -1,89 +1,93 @@
-# FCourt GitOps cho EKS
+# FCourt GitOps
 
-Repository này chứa cấu hình triển khai Kubernetes mà ArgoCD theo dõi cho 12 service FCourt và một số add-on nền tảng. Repo ứng dụng chứa mã nguồn và CI build image; repo này giữ manifest và tag image; repo `fcourt-infra` tạo EKS, mạng, IAM và EKS Pod Identity associations. Không lưu secret thật trong Git.
+Kubernetes configuration that Argo CD syncs to the FCourt EKS clusters (dev and prod): 12 Spring Boot services plus the platform add-ons they need. Kustomize everywhere; Helm charts are installed by Argo CD Applications with pinned versions.
 
-## Cấu trúc
+Repository split (see `docs/adr/0001-three-repositories.md`): the backend repo holds source code and image CI, `fcourt-infra` (Terraform) creates EKS, networking, IAM, Pod Identity associations and the prod managed data services, and this repo holds manifests and the image tag in each overlay. No real secrets are stored in Git.
 
-```text
-bootstrap/root-app.yaml       # Application gốc, apply thủ công một lần
-argocd/projects/              # AppProject platform và services
-argocd/appsets/               # ApplicationSet cho services dev; platform Apps trực tiếp
-platform/apps/                # Application cài add-on Helm đã pin phiên bản
-services/<service>/base/      # Deployment, Service, ConfigMap, ServiceAccount
-services/<service>/overlays/  # Cấu hình dev đang chạy; prod là khung chưa bật
-docs/                         # ADR về ranh giới ba repository
-scripts/validate.sh           # Dựng Kustomize và kiểm tra YAML qua kubectl
-```
-
-## Cấu trúc ArgoCD cha/con
+## Layout
 
 ```text
-fcourt-root (path argocd)
-  ├─ AppProjects                         wave -1
-  ├─ platform add-on Applications       wave 0 (wait for app health)
-  └─ services ApplicationSet            wave 1
+bootstrap/
+  dev/root-app.yaml            # root Application for the dev cluster  -> clusters/dev
+  prod/root-app.yaml           # root Application for the prod cluster -> clusters/prod
+clusters/                      # per-cluster entry points: what each cluster runs
+  dev/
+    kustomization.yaml         #   projects + shared add-ons + dev-only data + services
+    services-appset.yaml       #   ApplicationSet: one App per services/*/overlays/dev
+    platform-project-dev.patch.yaml  # dev-only additions to the platform AppProject
+  prod/
+    kustomization.yaml         #   projects + shared add-ons + services (no in-cluster data)
+    services-appset.yaml       #   ApplicationSet: one App per services/*/overlays/prod
+projects/                      # AppProjects platform and services (shared by both clusters)
+platform/
+  aws-load-balancer-controller/  # shared add-ons, one Application (Helm chart) each
+  external-secrets/
+  metrics-server/
+  dev-data/                    # DEV ONLY: in-cluster data; prod uses RDS / MSK / ElastiCache
+    cloudnative-pg/            #   operator-application.yaml, cluster-application.yaml, cluster/
+    strimzi/                   #   operator-application.yaml, kafka-application.yaml, kafka/
+    redis/                     #   redis-application.yaml, manifests/
+components/
+  spring-service/              # shared Deployment, Service, ServiceAccount, probes, resources, security context
+  alb-ingress/                 # shared public ALB Ingress (group fcourt-public)
+services/<service>/
+  base/                        # configmap.yaml, kustomization.yaml, optional deployment-env.yaml
+  overlays/dev/                # namespace fcourt-dev, image tag, replicas
+  overlays/prod/               # namespace fcourt-prod, image tag, replicas
+docs/adr/                      # architecture decision records
+scripts/validate.sh            # renders every Kustomize entry point
 ```
 
-Root app orders resources it directly manages: AppProjects at `-1`, direct platform Application resources at `0`, then the services ApplicationSet at `1`. Argo CD waits for health of the wave 0 Applications before advancing. Retry is configured for root and child Apps. Limitation: the ApplicationSet resource does not wait for health of the Applications it generates, so service Apps are not serialized by readiness. Progressive syncs (RollingSync) may be considered later; they are not enabled. The dev generator discovers `services/*/overlays/dev`, so adding a service remains a folder-only change; prod is not currently generated.
-## Khởi tạo ArgoCD
+## How bootstrap works
 
-1. Cài ArgoCD vào cluster EKS bằng quy trình phát hành đã được đội xác nhận.
-2. Thay `https://github.com/SBA301-SU26-BRO73/fcourt-gitops.git` trong `bootstrap/root-app.yaml`, `argocd/projects/` và `argocd/appsets/` bằng URL Git thật. Xác nhận branch `main` tồn tại và ArgoCD có quyền đọc repo.
-3. Apply Application gốc một lần:
+Each cluster gets exactly one root Application, applied once by hand after Argo CD is installed:
 
-   ```sh
-   kubectl create namespace argocd
-   kubectl apply -n argocd -f bootstrap/root-app.yaml
-   ```
+```sh
+kubectl create namespace argocd                            # if Argo CD is not installed yet
+kubectl apply -n argocd -f bootstrap/dev/root-app.yaml     # dev cluster
+kubectl apply -n argocd -f bootstrap/prod/root-app.yaml    # prod cluster
+```
 
-4. Điền cluster name, AWS region, VPC ID và xác nhận IAM/Helm values ở `platform/apps/` trước khi bật sync add-on. EKS Pod Identity associations được tạo bởi repo `fcourt-infra`.
+The root Application syncs `clusters/<env>`, which contains everything Argo CD needs for that cluster, ordered by sync wave:
 
-## Thêm service
+```text
+fcourt-root (path clusters/<env>)
+  |- wave -1  AppProjects (platform, services)
+  |- wave  0  platform Applications (add-ons; in dev also operators and in-cluster data)
+  '- wave  1  services ApplicationSet -> one Application per services/*/overlays/<env>
+```
 
-Tạo `services/<service>/base/` với Deployment, Service, ConfigMap, ServiceAccount và `kustomization.yaml`; thêm `overlays/dev/` và `overlays/prod/` với Kustomization theo cấu trúc hiện có. ApplicationSet dev tự phát hiện thư mục `overlays/dev`, vì vậy không cần đăng ký service ở nơi khác. Đọc `application.yml` của service để khai báo đầy đủ biến môi trường, health path và port. Chỉ thêm Ingress cho API cần truy cập từ bên ngoài; các service còn lại dùng ClusterIP.
+Argo CD waits for the wave 0 Applications to be healthy before it creates the ApplicationSet. The ApplicationSet does not wait for the Applications it generates, so service Apps reconcile concurrently. Retry with bounded backoff is set on the root and all child Applications. In dev, the CloudNativePG and Strimzi instance Applications use `SkipDryRunOnMissingResource=true` so their custom resources are accepted before the operator CRDs exist.
 
-## Luồng cập nhật image
+Before the first sync, replace the placeholders: the Git URL (if it changes), `<ECR_REGISTRY>`, `<IMAGE_TAG>`, the `<SET_...>` ConfigMap values, and in `platform/aws-load-balancer-controller/application.yaml` the cluster name, region and VPC ID. Pod Identity associations come from `fcourt-infra`.
 
-Image có dạng `<ECR_REGISTRY>/fcourt/<service>:<tag>`. CI build và đẩy image với tag bất biến, tốt nhất là commit SHA. Sau khi image sẵn sàng, CI cập nhật `images.newTag` trong `services/<service>/overlays/<env>/kustomization.yaml` bằng `kustomize edit set image`; ArgoCD tự sync từ commit Git. Không dùng `latest`.
+## Dev vs prod
 
-## Cấu hình hiện tại và giả định cần xử lý
-
-- Thay các giá trị `<...>` trước khi triển khai: URL repo, ECR registry/tag, endpoint database/Kafka/Redis, domain/TLS, cluster name, region và VPC ID.
-- Secret chỉ tham chiếu tới Kubernetes Secret `<service>-secrets` và key tương ứng. External Secrets hiện mới cài operator; chưa có SecretStore/ExternalSecret hay tên secret/key đã xác nhận.
-- Ingress prefixes are supported by backend controller mappings. The table below records route evidence; services without an Ingress have unverified external exposure intent. No gateway route config was found under `docker/`, `tools/` or `docs/`.
-
-| Service | Public prefixes | Evidence file |
+| | dev | prod |
 |---|---|---|
-| auth-service | `/api/auth` | `auth-service/src/main/java/com/fcourt/auth/account/AuthController.java` |
-| booking-service | `/api/bookings` | `booking-service/src/main/java/com/fcourt/booking/BookingController.java`, `OnlineBooking.java` |
-| discovery-service | — (no ingress; exposure intent unverified) | `discovery-service/src/main/java/com/fcourt/discovery/controller/BranchController.java` |
-| facility-service | — (no ingress; exposure intent unverified) | `facility-service/src/main/java/com/fcourt/facility/api/BranchController.java` |
-| notification-service | `/devices` | `notification-service/src/main/java/com/fcourt/notification/device/DeviceController.java` |
-| payment-service | `/api/payments` | `payment-service/src/main/java/com/fcourt/payment/CustomerPaymentsController.java`, `CheckoutController.java` |
-| subscription-service | `/api/subscriptions` | `subscription-service/src/main/java/com/fcourt/subscription/billing/BillingController.java` |
-| voucher-service | `/api/vouchers` | `voucher-service/src/main/java/com/fcourt/voucher/VoucherApplyController.java` |
-| pos-retail-service | — (no ingress; exposure intent unverified) | `pos-retail-service/src/main/java/com/fcourt/pos/api/PosController.java` |
-| reporting-service | — (no ingress; exposure intent unverified) | `reporting-service/src/main/java/com/fcourt/reporting/api/DashboardController.java` |
-| staff-operations-service | — (no ingress; exposure intent unverified) | `staff-operations-service/src/main/java/com/fcourt/staff/api/StaffController.java` |
-| slot-hold-engine | — (no ingress; exposure intent unverified) | `slot-hold-engine/src/main/java/com/fcourt/hold/HoldController.java` |
-- Health probe dùng `/actuator/health` theo cấu hình Spring Boot; xác nhận actuator có mặt trong image đã build.
-- `pos-retail-service` và `notification-service` đều khai báo cổng mặc định `8091`. Manifest POS đặt `SERVER_PORT` và container/service port thành `8092` để tránh xung đột.
-- Chart version được pin nhưng chưa kiểm chứng với phiên bản Kubernetes/IAM/VPC của EKS FCourt. Xem `platform/README.md`.
+| Entry point | `clusters/dev` | `clusters/prod` |
+| Services namespace | `fcourt-dev` (1 replica each) | `fcourt-prod` (2 replicas each) |
+| PostgreSQL | CloudNativePG in namespace `data` | RDS (Terraform) |
+| Kafka | Strimzi in namespace `data` | MSK (Terraform) |
+| Redis | Deployment in namespace `data` | ElastiCache (Terraform) |
+| Shared add-ons | ALB controller, External Secrets, metrics-server | same |
 
-## Dữ liệu trong cluster (dev)
+Prod is a skeleton: its overlays render, but service ConfigMaps still carry the dev in-cluster endpoints (`*.data.svc.cluster.local`) and the `fcourt-postgres-superuser` secret reference, because those values live in `services/<service>/base/`. Before enabling prod, move them into `overlays/prod` (or a patch) and point them at RDS, MSK and ElastiCache.
+
+### Dev in-cluster data
 
 ```text
-fcourt-dev services ── PostgreSQL ── fcourt-postgres-rw.data.svc.cluster.local:5432
-                   ├─ Redis ─────── redis.data.svc.cluster.local:6379
-                   └─ Kafka ─────── fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092
-                                      └─ KafkaTopic CRs (events và DLT)
+fcourt-dev services -- PostgreSQL  fcourt-postgres-rw.data.svc.cluster.local:5432
+                    |- Redis       redis.data.svc.cluster.local:6379
+                    '- Kafka       fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092
 ```
 
-Dev dùng CloudNativePG cho PostgreSQL, Strimzi cho Kafka và Redis 7 trong namespace `data`. PostgreSQL tạo 11 database theo mặc định của backend: `auth_db`, `booking_db`, `discovery_db`, `facility_db`, `notification_db`, `payment_db`, `pos_retail_db`, `reporting_db`, `staff_db`, `subscription_db`, `voucher_db`. Tất cả dùng user `postgres` với mật khẩu lấy từ Secret `fcourt-postgres-superuser`, key `password`; mật khẩu không nằm trong Git. Đây là một tài khoản chia sẻ có quyền cao, chỉ phù hợp cho dev.
+- PostgreSQL creates 11 databases (`auth_db`, `booking_db`, `discovery_db`, `facility_db`, `notification_db`, `payment_db`, `pos_retail_db`, `reporting_db`, `staff_db`, `subscription_db`, `voucher_db`). Services connect as `postgres` with the password from Secret `fcourt-postgres-superuser`, key `password`. This is one shared high-privilege account, acceptable for dev only.
+- Redis uses `emptyDir`, has no password and loses its data on restart.
+- Kafka is plain internal, auto-create is off, and topics (events and DLT) are declared as `KafkaTopic` resources in `platform/dev-data/strimzi/kafka/topics.yaml`.
+- PostgreSQL and Kafka use single-AZ gp3 PVCs, with no HA and no backups. Do not reuse this setup in prod.
 
-Redis dùng `emptyDir` vì cache/hold coordination dev được phép mất khi pod khởi động lại; Redis không có mật khẩu. Kafka bootstrap là `fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092`, listener plain nội bộ, không bật auto-create; topics được khai báo tường minh.
-
-Truy cập để debug bằng port-forward:
+Debug access:
 
 ```sh
 kubectl -n data port-forward svc/fcourt-postgres-rw 5432:5432
@@ -91,12 +95,58 @@ kubectl -n data port-forward svc/redis 6379:6379
 kubectl -n data port-forward svc/fcourt-kafka-kafka-bootstrap 9092:9092
 ```
 
-PostgreSQL và Kafka lưu trên PVC EBS gp3 trong một AZ. Dữ liệu mất nếu volume hoặc cluster bị xóa; không có multi-AZ HA. Backup chưa được cấu hình: chưa có CNPG backup object, WAL archive, object storage target hay restore drill. Redis không bền vững do `emptyDir`. Cấu hình này không phù hợp để dùng nguyên trạng ở prod.
+## How a service is built
 
-## Kiểm tra cục bộ
+`components/spring-service` holds the Deployment, Service and ServiceAccount shared by all services: non-root user, read-only root filesystem, `/tmp` emptyDir, `/actuator/health` probes, resource requests and limits. It uses placeholder names and fills them in from the service's own ConfigMap with Kustomize replacements: the `app.kubernetes.io/name` label gives every resource name and selector, `metadata.name` gives the `envFrom` reference, and `SERVER_PORT` gives the container and Service port. `components/alb-ingress` does the same for the public Ingress.
+
+A service base therefore contains only what is specific to it:
+
+- `configmap.yaml`: `<service>-config`, labelled `app.kubernetes.io/name: <service>`, with `SERVER_PORT` and the Spring environment variables.
+- `deployment-env.yaml` (optional): `env` entries that reference Secrets.
+- `kustomization.yaml`: the components, the image name, and for public services the Ingress path.
+
+## Add a service
+
+1. Create `services/<service>/base/configmap.yaml`, named `<service>-config`, with label `app.kubernetes.io/name: <service>`, `SERVER_PORT` and the variables from the service's `application.yml`. Pick a port no other service uses.
+2. If the service needs secrets, add `services/<service>/base/deployment-env.yaml` (copy one from an existing service). Secrets are Kubernetes Secrets named `<service>-secrets`.
+3. Create `services/<service>/base/kustomization.yaml` (copy an existing one). Change the image `newName` to `<ECR_REGISTRY>/fcourt/<service>`. Keep `components/alb-ingress` and the Ingress path patch only if the API is public.
+4. Create `services/<service>/overlays/dev/kustomization.yaml` and `overlays/prod/kustomization.yaml` (copy an existing pair and replace the service name).
+5. Run `bash scripts/validate.sh`.
+
+No other registration is needed: the ApplicationSets discover `services/*/overlays/<env>`.
+
+## Image updates
+
+Images are `<ECR_REGISTRY>/fcourt/<service>:<tag>`. CI builds with an immutable tag (commit SHA preferred) and sets `images[].newTag` in `services/<service>/overlays/<env>/kustomization.yaml` with `kustomize edit set image`; Argo CD syncs from the new commit. Never use `latest`.
+
+## Public routes and assumptions
+
+Ingress paths follow the backend controller mappings. Services without an Ingress are ClusterIP only; whether they should be exposed has not been verified.
+
+| Service | Port | Public prefix |
+|---|---|---|
+| auth-service | 8081 | `/api/auth` |
+| subscription-service | 8082 | `/api/subscriptions` |
+| facility-service | 8083 | none |
+| reporting-service | 8084 | none |
+| discovery-service | 8085 | none |
+| voucher-service | 8086 | `/api/vouchers` |
+| slot-hold-engine | 8087 | none |
+| booking-service | 8088 | `/api/bookings` |
+| payment-service | 8089 | `/api/payments` |
+| staff-operations-service | 8090 | none |
+| notification-service | 8091 | `/devices` |
+| pos-retail-service | 8092 | none |
+
+- `pos-retail-service` and `notification-service` both default to `8091` in code. The POS manifest sets `SERVER_PORT` to `8092` to avoid the clash.
+- Secrets are referenced by name only. External Secrets is installed as an operator, but no SecretStore or ExternalSecret exists yet.
+- Confirm that the Actuator health endpoint is present in the built images.
+- Chart versions are pinned but not tested against the clusters. See `platform/README.md`.
+
+## Local validation
 
 ```sh
 bash scripts/validate.sh
 ```
 
-Kiểm tra chỉ render Kustomize và parse manifest bằng kubectl cục bộ; không cần hoặc truy cập cluster/AWS.
+Renders every Kustomize entry point (bootstrap, clusters, platform, every service overlay) with `kustomize` or `kubectl kustomize`. No cluster or AWS access is needed.

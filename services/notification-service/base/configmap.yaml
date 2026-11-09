@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notification-service-config
+  labels:
+    app.kubernetes.io/name: notification-service
+data:
+  SERVER_PORT: '8091'
+  NOTIFICATION_DATABASE_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/notification_db"
+  NOTIFICATION_DATABASE_USER: 'postgres'
+  KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
+  NOTIFICATION_SMTP_HOST: '<SET_NOTIFICATION_SMTP_HOST>'
+  NOTIFICATION_SMTP_PORT: '587'
+  NOTIFICATION_SMTP_AUTH: 'true'
+  NOTIFICATION_SMTP_STARTTLS: 'true'
+  NOTIFICATION_ENABLED: 'true'
+  NOTIFICATION_TOPICS: 'fcourt.auth.events,fcourt.payment.events,fcourt.booking.events'
+  AUTH_JWK_SET_URI: '<SET_AUTH_JWK_SET_URI>'
+  AUTH_JWT_ISSUER: '<SET_AUTH_JWT_ISSUER>'
+  AUTH_JWT_AUDIENCE: 'fcourt'
+  PUSH_AWS_REGION: 'ap-southeast-1'
+  PUSH_SNS_PLATFORM_APPLICATION_ARN: ''
+  NOTIFICATION_MAIL_FROM: 'FCOURT <no-reply@fcourt.example>'
+  NOTIFICATION_RESET_PASSWORD_URL: '<SET_NOTIFICATION_RESET_PASSWORD_URL>'
+  NOTIFICATION_RETRY_ATTEMPTS: '3'
+  NOTIFICATION_RETRY_INTERVAL_MS: '2000'

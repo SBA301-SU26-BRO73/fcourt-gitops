@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reporting-service
+spec:
+  template:
+    spec:
+      containers:
+        - name: reporting-service
+          env:
+            - name: REPORTING_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: fcourt-postgres-superuser
+                  key: password

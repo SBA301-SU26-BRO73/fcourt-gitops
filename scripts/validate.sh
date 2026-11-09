@@ -1,30 +1,44 @@
 #!/usr/bin/env bash
+# Renders every Kustomize entry point in the repository. Needs kubectl (or a
+# standalone kustomize binary); no cluster or AWS access is used.
 set -euo pipefail
 
-if ! command -v kubectl >/dev/null 2>&1; then
-  echo "ERROR: kubectl is required" >&2
+if command -v kustomize >/dev/null 2>&1; then
+  build=(kustomize build)
+elif command -v kubectl >/dev/null 2>&1; then
+  build=(kubectl kustomize)
+else
+  echo "ERROR: kustomize or kubectl is required" >&2
   exit 1
 fi
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root_dir"
 
-echo "== Service overlays =="
-for env in dev prod; do
-  for overlay in services/*/overlays/"$env"; do
-    echo "Rendering $overlay"
-    kubectl kustomize "$overlay" >/dev/null
-  done
+count=0
+render() {
+  echo "Rendering $1"
+  "${build[@]}" "$1" >/dev/null
+  count=$((count + 1))
+}
+
+echo "== Bootstrap (one root Application per cluster) =="
+for dir in bootstrap/*/; do render "${dir%/}"; done
+
+echo "== Cluster entry points =="
+for dir in clusters/*/; do render "${dir%/}"; done
+
+echo "== Platform add-ons and dev-only data (Application wrappers) =="
+for dir in platform/*/ platform/dev-data/*/; do
+  [ -f "$dir/kustomization.yaml" ] && render "${dir%/}"
 done
 
-echo "== Platform Applications =="
-for app in platform/apps/*; do
-  echo "Parsing $app"
-  kubectl kustomize "$app" >/dev/null
+echo "== Dev-only data manifests synced by child Applications =="
+for dir in platform/dev-data/*/*/; do
+  [ -f "$dir/kustomization.yaml" ] && render "${dir%/}"
 done
 
-echo "== ArgoCD manifests =="
-kubectl kustomize argocd >/dev/null
-kubectl kustomize bootstrap >/dev/null
+echo "== Services (every overlay) =="
+for dir in services/*/overlays/*/; do render "${dir%/}"; done
 
-echo "Validation passed: 12 dev overlays, 12 prod skeletons, 3 platform Applications, argocd/, bootstrap/."
+echo "Validation passed: $count Kustomize targets rendered."

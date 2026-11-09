@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: voucher-service-config
+  labels:
+    app.kubernetes.io/name: voucher-service
+data:
+  SERVER_PORT: '8086'
+  KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
+  DATABASE_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/voucher_db"
+  DATABASE_USER: 'postgres'
+  FACILITY_URL: '<SET_FACILITY_URL>'
+  AUTH_JWK_SET_URI: '<SET_AUTH_JWK_SET_URI>'
+  AUTH_JWT_ISSUER: '<SET_AUTH_JWT_ISSUER>'
+  AUTH_JWT_AUDIENCE: 'fcourt'
+  VOUCHER_GRPC_ENABLED: 'true'
+  VOUCHER_GRPC_HOST: '127.0.0.1'
+  VOUCHER_GRPC_PORT: '9086'
+  VOUCHER_GRPC_CERTIFICATE: ''

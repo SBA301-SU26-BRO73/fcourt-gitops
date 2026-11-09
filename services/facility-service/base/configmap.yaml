@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: facility-service-config
+  labels:
+    app.kubernetes.io/name: facility-service
+data:
+  SERVER_PORT: '8083'
+  FACILITY_DB_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/facility_db"
+  FACILITY_DB_USER: 'postgres'
+  KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
+  REDIS_HOST: "redis.data.svc.cluster.local"
+  REDIS_PORT: '6379'
+  FACILITY_REALTIME_ENABLED: 'false'
+  AUTH_JWK_SET_URI: '<SET_AUTH_JWK_SET_URI>'
+  AUTH_JWT_ISSUER: '<SET_AUTH_JWT_ISSUER>'
+  AUTH_JWT_AUDIENCE: 'fcourt'
+  SUBSCRIPTION_BASE_URL: ''
+  SUBSCRIPTION_DEFAULT_MAX_BRANCHES: '3'
+  SUBSCRIPTION_DEFAULT_MAX_COURTS: '15'
+  FACILITY_IMAGES_MAX_PER_BRANCH: '10'
+  FACILITY_IMAGES_MAX_FILE_BYTES: '5242880'
+  CLOUDINARY_CLOUD_NAME: ''
+  DISCOVERY_BASE_URL: ''
+  FACILITY_RESERVATION_SWEEP_MS: '15000'
+  FACILITY_EVENTS_ENABLED: 'true'
+  BRANCH_UPDATED_TOPIC: 'facility.branch-updated.v1'
+  BRANCH_UPDATED_TOPIC_PARTITIONS: '3'
+  FACILITY_OUTBOX_DELAY_MS: '1000'
+  FACILITY_BOOTSTRAP_SNAPSHOTS: 'true'

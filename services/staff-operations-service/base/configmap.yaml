@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: staff-operations-service-config
+  labels:
+    app.kubernetes.io/name: staff-operations-service
+data:
+  SERVER_PORT: '8090'
+  STAFF_DATABASE_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/staff_db"
+  STAFF_DATABASE_USER: 'postgres'
+  KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
+  STAFF_ENDING_SOON_MINUTES: '10'
+  HOLD_GRPC_TARGET: '<SET_HOLD_GRPC_TARGET>'
+  BOOKING_GRPC_TARGET: '<SET_BOOKING_GRPC_TARGET>'
+  STAFF_GRPC_PLAINTEXT: 'false'
+  STAFF_GRPC_DEADLINE_MS: '2000'
+  WALK_IN_FIXED_SURCHARGE: '0'
+  WALK_IN_SURCHARGE_PERCENT: '0'
+  WALK_IN_PRICING_POLICY: 'counter-v1'
+  STAFF_TIME_ZONE: 'Asia/Ho_Chi_Minh'
+  BOOKING_URL: '<SET_BOOKING_URL>'
+  DISCOVERY_URL: '<SET_DISCOVERY_URL>'
+  STAFF_EVENTS_ENABLED: 'true'
+  STAFF_EVENTS_TOPIC: 'fcourt.staff.events'
+  AUTH_URL: '<SET_AUTH_URL>'
+  AUTH_JWK_SET_URI: '<SET_AUTH_JWK_SET_URI>'
+  AUTH_JWT_ISSUER: '<SET_AUTH_JWT_ISSUER>'
+  AUTH_JWT_AUDIENCE: 'fcourt'
+  FACILITY_URL: '<SET_FACILITY_URL>'

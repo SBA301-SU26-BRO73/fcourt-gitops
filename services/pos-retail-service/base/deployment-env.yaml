@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pos-retail-service
+spec:
+  template:
+    spec:
+      containers:
+        - name: pos-retail-service
+          env:
+            - name: POS_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: fcourt-postgres-superuser
+                  key: password
+            - name: POS_BOOKING_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: pos-retail-service-secrets
+                  key: POS_BOOKING_SERVICE_TOKEN
+            - name: POS_SETTLEMENT_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: pos-retail-service-secrets
+                  key: POS_SETTLEMENT_SERVICE_TOKEN

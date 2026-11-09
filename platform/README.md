@@ -1,14 +1,29 @@
-# Nền tảng EKS
+# Platform
 
-Các Application của ArgoCD trong `apps/` cài add-on bằng Helm chart với phiên bản đã pin. Các phiên bản chart đã được tra cứu trên Artifact Hub ngày 09/11/2026; chưa kiểm thử với phiên bản Kubernetes, cấu hình IAM hoặc VPC của cluster FCourt.
+Argo CD Applications for cluster add-ons. Helm chart versions are pinned. They were looked up on Artifact Hub on 2026-11-09 and have not been tested against the FCourt Kubernetes version, IAM setup or VPC.
 
-- AWS Load Balancer Controller: chart `3.6.2` từ `https://aws.github.io/eks-charts`; [Artifact Hub](https://artifacthub.io/packages/helm/aws/aws-load-balancer-controller/). Cần cluster name và Pod Identity association/permissions.
-- External Secrets Operator: chart `0.19.2` từ `https://charts.external-secrets.io`; [Artifact Hub](https://artifacthub.io/packages/helm/external-secrets-operator/external-secrets/0.19.2). Cần cấu hình SecretStore/ClusterSecretStore và Pod Identity.
-- metrics-server: chart `3.12.2` từ `https://kubernetes-sigs.github.io/metrics-server/`; [Artifact Hub](https://artifacthub.io/packages/helm/metrics-server/metrics-server/3.12.2).
-- CloudNativePG operator: chart `0.23.2` từ `https://cloudnative-pg.github.io/charts`; **chưa xác minh registry chart/version trong môi trường hiện tại**. Cluster `fcourt-postgres` là CR riêng; 1 instance, 10Gi gp3, database init job.
-- Strimzi Kafka operator: chart `0.45.0` từ `https://strimzi.io/charts/`; **chưa xác minh chart/version và tương thích Kubernetes**. Kafka 3.9.0 KRaft, một node broker/controller, 10Gi gp3; bootstrap `fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092`.
-- Redis: image `redis:7.4-alpine` (tag pin, **chưa xác minh registry/tag còn được cunguh cấp**), một replica, memory-limited, `emptyDir`.
+## Shared add-ons (dev and prod)
 
-Operator Applications và instance Applications đều ở platform wave `0`, trước ApplicationSet services wave `1`. PostgreSQL/Kafka instance Apps dùng `SkipDryRunOnMissingResource=true` để CRDs cài trước khi Argo kiểm tra custom resources. PostgreSQL shared `postgres` credential do CNPG sinh; apps tham chiếu Secret `fcourt-postgres-superuser`, key `password`. Databases được init bằng Job sau khi Cluster sẵn sàng.
+Listed in both `clusters/dev` and `clusters/prod`.
 
-Các giá trị cluster-specific hiện là placeholder. Xác minh tương thích chart, IAM policy, subnet discovery, và values của từng chart trước khi sync platform.
+| Component | Chart | Notes |
+|---|---|---|
+| `aws-load-balancer-controller` | `3.6.2` from `https://aws.github.io/eks-charts` | Needs cluster name, region and VPC ID in the Application values, plus a Pod Identity association from `fcourt-infra`. |
+| `external-secrets` | `0.19.2` from `https://charts.external-secrets.io` | Operator only. SecretStore / ClusterSecretStore and Pod Identity are not configured yet. |
+| `metrics-server` | `3.12.2` from `https://kubernetes-sigs.github.io/metrics-server/` | |
+
+## dev-data: DEV ONLY
+
+In-cluster data for the dev cluster, listed only in `clusters/dev`. Prod uses RDS, MSK and ElastiCache created by `fcourt-infra`. Each component folder holds the Application files and a subfolder of plain manifests that the instance Application syncs.
+
+| Component | Applications | Synced manifests |
+|---|---|---|
+| `cloudnative-pg` | operator chart `0.23.2` from `https://cloudnative-pg.github.io/charts`; instance Application | `cluster/`: `Cluster fcourt-postgres` (1 instance, 10Gi gp3, PostgreSQL 16.4) and the Job that creates the service databases |
+| `strimzi` | operator chart `0.45.0` from `https://strimzi.io/charts/`; instance Application | `kafka/`: Kafka 3.9.0 KRaft, one combined node, 10Gi gp3, and the `KafkaTopic` resources |
+| `redis` | instance Application | `manifests/`: `redis:7.4-alpine`, one replica, memory-limited, `emptyDir` |
+
+The chart registries and versions for CloudNativePG and Strimzi, and the Redis image tag, have not been verified in this environment.
+
+All Applications are in sync wave `0`. The instance Applications for CloudNativePG and Strimzi use `SkipDryRunOnMissingResource=true`, so their custom resources are not rejected before the operator CRDs exist. The CloudNativePG Job that creates the databases is in wave `1` inside its own Application. CloudNativePG generates the `postgres` credential in Secret `fcourt-postgres-superuser`, key `password`, which the services reference.
+
+The shared `platform` AppProject does not allow these chart repos and namespaces. `clusters/dev/platform-project-dev.patch.yaml` adds them for dev only.

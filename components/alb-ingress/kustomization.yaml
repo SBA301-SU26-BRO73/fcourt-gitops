@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+# Public ALB Ingress (shared group "fcourt-public") for a service that uses the
+# spring-service component. Name and backend port come from the service's
+# ConfigMap (label app.kubernetes.io/name and SERVER_PORT); the service base
+# must patch the public path:
+#   patches:
+#     - target: {kind: Ingress}
+#       patch: |-
+#         - {op: replace, path: /spec/rules/0/http/paths/0/path, value: /api/example}
+resources:
+  - ingress.yaml
+replacements:
+  - source:
+      kind: ConfigMap
+      fieldPath: metadata.labels.[app.kubernetes.io/name]
+    targets:
+      - select:
+          kind: Ingress
+        fieldPaths:
+          - metadata.name
+          - spec.rules.0.http.paths.0.backend.service.name
+  - source:
+      kind: ConfigMap
+      fieldPath: data.SERVER_PORT
+    targets:
+      - select:
+          kind: Ingress
+        fieldPaths:
+          - spec.rules.0.http.paths.0.backend.service.port.number

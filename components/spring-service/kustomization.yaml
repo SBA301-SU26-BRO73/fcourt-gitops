@@ -1,0 +1,59 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+# Shared Deployment, Service and ServiceAccount for every FCourt Spring Boot
+# service. Resources use the placeholder name "spring-service"; the
+# replacements below overwrite it with values read from the service's own
+# ConfigMap, so a service base only has to provide:
+#   - a ConfigMap named "<service>-config" that carries the label
+#     app.kubernetes.io/name=<service> and the key SERVER_PORT
+#   - an `images` entry that maps "spring-service" to the real image
+#   - optionally a Deployment patch with `env` (secret references)
+resources:
+  - serviceaccount.yaml
+  - deployment.yaml
+  - service.yaml
+replacements:
+  # Service name (from the ConfigMap label) -> every place the name appears.
+  - source:
+      kind: ConfigMap
+      fieldPath: metadata.labels.[app.kubernetes.io/name]
+    targets:
+      - select:
+          kind: ServiceAccount
+        fieldPaths:
+          - metadata.name
+      - select:
+          kind: Deployment
+        fieldPaths:
+          - metadata.name
+          - spec.selector.matchLabels.[app.kubernetes.io/name]
+          - spec.template.metadata.labels.[app.kubernetes.io/name]
+          - spec.template.spec.serviceAccountName
+          - spec.template.spec.containers.0.name
+      - select:
+          kind: Service
+        fieldPaths:
+          - metadata.name
+          - spec.selector.[app.kubernetes.io/name]
+  # ConfigMap name -> envFrom reference.
+  - source:
+      kind: ConfigMap
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Deployment
+        fieldPaths:
+          - spec.template.spec.containers.0.envFrom.0.configMapRef.name
+  # SERVER_PORT -> container port and Service port.
+  - source:
+      kind: ConfigMap
+      fieldPath: data.SERVER_PORT
+    targets:
+      - select:
+          kind: Deployment
+        fieldPaths:
+          - spec.template.spec.containers.0.ports.0.containerPort
+      - select:
+          kind: Service
+        fieldPaths:
+          - spec.ports.0.port

@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subscription-service
+spec:
+  template:
+    spec:
+      containers:
+        - name: subscription-service
+          env:
+            - name: SUBSCRIPTION_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: fcourt-postgres-superuser
+                  key: password
+            - name: PAYOS_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: subscription-service-secrets
+                  key: PAYOS_CLIENT_ID
+            - name: PAYOS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: subscription-service-secrets
+                  key: PAYOS_API_KEY

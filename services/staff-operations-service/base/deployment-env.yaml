@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: staff-operations-service
+spec:
+  template:
+    spec:
+      containers:
+        - name: staff-operations-service
+          env:
+            - name: STAFF_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: fcourt-postgres-superuser
+                  key: password

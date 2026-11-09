@@ -1,0 +1,26 @@
+# DEV ONLY. The shared `platform` AppProject (projects/platform.yaml) does not
+# allow the in-cluster data components that only dev runs: the CloudNativePG
+# and Strimzi chart repos and the data, cnpg-system and strimzi-system
+# namespaces. Prod never installs them, so the allowance lives here and not in
+# the shared project.
+- op: add
+  path: /spec/sourceRepos/-
+  value: https://cloudnative-pg.github.io/charts
+- op: add
+  path: /spec/sourceRepos/-
+  value: https://strimzi.io/charts/
+- op: add
+  path: /spec/destinations/-
+  value:
+    namespace: data
+    server: https://kubernetes.default.svc
+- op: add
+  path: /spec/destinations/-
+  value:
+    namespace: cnpg-system
+    server: https://kubernetes.default.svc
+- op: add
+  path: /spec/destinations/-
+  value:
+    namespace: strimzi-system
+    server: https://kubernetes.default.svc
