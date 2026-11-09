@@ -4,11 +4,11 @@ metadata:
   name: facility-service-config
 data:
   SERVER_PORT: '8083'
-  FACILITY_DB_URL: '<SET_FACILITY_DB_URL>'
+  FACILITY_DB_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/facility_db"
   FACILITY_DB_USER: 'postgres'
-  KAFKA_BOOTSTRAP_SERVERS: '<SET_KAFKA_BOOTSTRAP_SERVERS>'
-  REDIS_HOST: '<SET_REDIS_HOST>'
-  REDIS_PORT: '6387'
+  KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
+  REDIS_HOST: "redis.data.svc.cluster.local"
+  REDIS_PORT: '6379'
   FACILITY_REALTIME_ENABLED: 'false'
   AUTH_JWK_SET_URI: '<SET_AUTH_JWK_SET_URI>'
   AUTH_JWT_ISSUER: '<SET_AUTH_JWT_ISSUER>'
@@ -70,11 +70,6 @@ spec:
                 secretKeyRef:
                   name: facility-service-secrets
                   key: FACILITY_DB_PASSWORD
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: facility-service-secrets
-                  key: REDIS_PASSWORD
             - name: CLOUDINARY_URL
               valueFrom:
                 secretKeyRef:

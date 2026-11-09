@@ -4,9 +4,9 @@ metadata:
   name: staff-operations-service-config
 data:
   SERVER_PORT: '8090'
-  STAFF_DATABASE_URL: '<SET_STAFF_DATABASE_URL>'
+  STAFF_DATABASE_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/staff_db"
   STAFF_DATABASE_USER: 'postgres'
-  KAFKA_BOOTSTRAP_SERVERS: '<SET_KAFKA_BOOTSTRAP_SERVERS>'
+  KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
   STAFF_ENDING_SOON_MINUTES: '10'
   HOLD_GRPC_TARGET: '<SET_HOLD_GRPC_TARGET>'
   BOOKING_GRPC_TARGET: '<SET_BOOKING_GRPC_TARGET>'
@@ -67,8 +67,8 @@ spec:
             - name: STAFF_DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: staff-operations-service-secrets
-                  key: STAFF_DATABASE_PASSWORD
+                  name: fcourt-postgres-superuser
+                  key: password
           readinessProbe:
             httpGet:
               path: /actuator/health

@@ -4,9 +4,9 @@ metadata:
   name: booking-service-config
 data:
   SERVER_PORT: '8088'
-  DATABASE_URL: '<SET_DATABASE_URL>'
+  DATABASE_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/booking_db"
   DATABASE_USER: 'postgres'
-  KAFKA_BOOTSTRAP_SERVERS: '<SET_KAFKA_BOOTSTRAP_SERVERS>'
+  KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
   AUTH_JWK_SET_URI: '<SET_AUTH_JWK_SET_URI>'
   AUTH_JWT_ISSUER: '<SET_AUTH_JWT_ISSUER>'
   AUTH_JWT_AUDIENCE: 'fcourt'
@@ -53,8 +53,8 @@ spec:
             - name: DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: booking-service-secrets
-                  key: DATABASE_PASSWORD
+                  name: fcourt-postgres-superuser
+                  key: password
           readinessProbe:
             httpGet:
               path: /actuator/health

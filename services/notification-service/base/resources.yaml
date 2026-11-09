@@ -4,9 +4,9 @@ metadata:
   name: notification-service-config
 data:
   SERVER_PORT: '8091'
-  NOTIFICATION_DATABASE_URL: '<SET_NOTIFICATION_DATABASE_URL>'
+  NOTIFICATION_DATABASE_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/notification_db"
   NOTIFICATION_DATABASE_USER: 'postgres'
-  KAFKA_BOOTSTRAP_SERVERS: '<SET_KAFKA_BOOTSTRAP_SERVERS>'
+  KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
   NOTIFICATION_SMTP_HOST: '<SET_NOTIFICATION_SMTP_HOST>'
   NOTIFICATION_SMTP_PORT: '587'
   NOTIFICATION_SMTP_AUTH: 'true'
@@ -64,8 +64,8 @@ spec:
             - name: NOTIFICATION_DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: notification-service-secrets
-                  key: NOTIFICATION_DATABASE_PASSWORD
+                  name: fcourt-postgres-superuser
+                  key: password
             - name: NOTIFICATION_SMTP_USER
               valueFrom:
                 secretKeyRef:

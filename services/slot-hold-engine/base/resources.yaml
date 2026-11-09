@@ -4,7 +4,7 @@ metadata:
   name: slot-hold-engine-config
 data:
   SERVER_PORT: '8087'
-  REDIS_ADDRESS: '<SET_REDIS_ADDRESS>'
+  REDIS_ADDRESS: "redis://redis.data.svc.cluster.local:6379"
   DISCOVERY_URL: '<SET_DISCOVERY_URL>'
 ---
 apiVersion: v1
@@ -45,11 +45,6 @@ spec:
             - configMapRef:
                 name: slot-hold-engine-config
           env:
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: slot-hold-engine-secrets
-                  key: REDIS_PASSWORD
           readinessProbe:
             httpGet:
               path: /actuator/health

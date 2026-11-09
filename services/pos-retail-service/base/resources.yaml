@@ -4,9 +4,9 @@ metadata:
   name: pos-retail-service-config
 data:
   SERVER_PORT: '8092'
-  POS_DATABASE_URL: '<SET_POS_DATABASE_URL>'
+  POS_DATABASE_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/pos_retail_db"
   POS_DATABASE_USER: 'postgres'
-  KAFKA_BOOTSTRAP_SERVERS: '<SET_KAFKA_BOOTSTRAP_SERVERS>'
+  KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
   AUTH_URL: '<SET_AUTH_URL>'
   STAFF_URL: '<SET_STAFF_URL>'
   FACILITY_URL: '<SET_FACILITY_URL>'
@@ -58,8 +58,8 @@ spec:
             - name: POS_DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: pos-retail-service-secrets
-                  key: POS_DATABASE_PASSWORD
+                  name: fcourt-postgres-superuser
+                  key: password
             - name: POS_BOOKING_SERVICE_TOKEN
               valueFrom:
                 secretKeyRef:

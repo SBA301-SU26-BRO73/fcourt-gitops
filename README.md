@@ -70,6 +70,29 @@ Image có dạng `<ECR_REGISTRY>/fcourt/<service>:<tag>`. CI build và đẩy im
 - `pos-retail-service` và `notification-service` đều khai báo cổng mặc định `8091`. Manifest POS đặt `SERVER_PORT` và container/service port thành `8092` để tránh xung đột.
 - Chart version được pin nhưng chưa kiểm chứng với phiên bản Kubernetes/IAM/VPC của EKS FCourt. Xem `platform/README.md`.
 
+## Dữ liệu trong cluster (dev)
+
+```text
+fcourt-dev services ── PostgreSQL ── fcourt-postgres-rw.data.svc.cluster.local:5432
+                   ├─ Redis ─────── redis.data.svc.cluster.local:6379
+                   └─ Kafka ─────── fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092
+                                      └─ KafkaTopic CRs (events và DLT)
+```
+
+Dev dùng CloudNativePG cho PostgreSQL, Strimzi cho Kafka và Redis 7 trong namespace `data`. PostgreSQL tạo 11 database theo mặc định của backend: `auth_db`, `booking_db`, `discovery_db`, `facility_db`, `notification_db`, `payment_db`, `pos_retail_db`, `reporting_db`, `staff_db`, `subscription_db`, `voucher_db`. Tất cả dùng user `postgres` với mật khẩu lấy từ Secret `fcourt-postgres-superuser`, key `password`; mật khẩu không nằm trong Git. Đây là một tài khoản chia sẻ có quyền cao, chỉ phù hợp cho dev.
+
+Redis dùng `emptyDir` vì cache/hold coordination dev được phép mất khi pod khởi động lại; Redis không có mật khẩu. Kafka bootstrap là `fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092`, listener plain nội bộ, không bật auto-create; topics được khai báo tường minh.
+
+Truy cập để debug bằng port-forward:
+
+```sh
+kubectl -n data port-forward svc/fcourt-postgres-rw 5432:5432
+kubectl -n data port-forward svc/redis 6379:6379
+kubectl -n data port-forward svc/fcourt-kafka-kafka-bootstrap 9092:9092
+```
+
+PostgreSQL và Kafka lưu trên PVC EBS gp3 trong một AZ. Dữ liệu mất nếu volume hoặc cluster bị xóa; không có multi-AZ HA. Backup chưa được cấu hình: chưa có CNPG backup object, WAL archive, object storage target hay restore drill. Redis không bền vững do `emptyDir`. Cấu hình này không phù hợp để dùng nguyên trạng ở prod.
+
 ## Kiểm tra cục bộ
 
 ```sh

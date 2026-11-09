@@ -4,9 +4,9 @@ metadata:
   name: auth-service-config
 data:
   SERVER_PORT: '8081'
-  AUTH_DATABASE_URL: '<SET_AUTH_DATABASE_URL>'
+  AUTH_DATABASE_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/auth_db"
   AUTH_DATABASE_USER: 'postgres'
-  KAFKA_BOOTSTRAP_SERVERS: '<SET_KAFKA_BOOTSTRAP_SERVERS>'
+  KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
   AUTH_GOOGLE_CLIENT_ID: ''
   AUTH_GOOGLE_JWK_SET_URI: 'https://www.googleapis.com/oauth2/v3/certs'
   AUTH_JWK_SET_URI: '<SET_AUTH_JWK_SET_URI>'
@@ -64,8 +64,8 @@ spec:
             - name: AUTH_DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: auth-service-secrets
-                  key: AUTH_DATABASE_PASSWORD
+                  name: fcourt-postgres-superuser
+                  key: password
             - name: AUTH_JWT_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:

@@ -4,7 +4,7 @@ metadata:
   name: subscription-service-config
 data:
   SERVER_PORT: '8082'
-  SUBSCRIPTION_DATABASE_URL: '<SET_SUBSCRIPTION_DATABASE_URL>'
+  SUBSCRIPTION_DATABASE_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/subscription_db"
   SUBSCRIPTION_DATABASE_USER: 'postgres'
   SUBSCRIPTION_TIME_ZONE: 'Asia/Ho_Chi_Minh'
   PAYOS_CHECKSUM_KEY: ''
@@ -58,8 +58,8 @@ spec:
             - name: SUBSCRIPTION_DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: subscription-service-secrets
-                  key: SUBSCRIPTION_DATABASE_PASSWORD
+                  name: fcourt-postgres-superuser
+                  key: password
             - name: PAYOS_CLIENT_ID
               valueFrom:
                 secretKeyRef:

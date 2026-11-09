@@ -4,11 +4,11 @@ metadata:
   name: payment-service-config
 data:
   SERVER_PORT: '8089'
-  DATABASE_URL: '<SET_DATABASE_URL>'
+  DATABASE_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/payment_db"
   DATABASE_USER: 'postgres'
-  REDIS_HOST: '<SET_REDIS_HOST>'
-  REDIS_PORT: '6399'
-  KAFKA_BOOTSTRAP_SERVERS: '<SET_KAFKA_BOOTSTRAP_SERVERS>'
+  REDIS_HOST: "redis.data.svc.cluster.local"
+  REDIS_PORT: '6379'
+  KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
   AUTH_JWK_SET_URI: '<SET_AUTH_JWK_SET_URI>'
   AUTH_JWT_ISSUER: '<SET_AUTH_JWT_ISSUER>'
   AUTH_JWT_AUDIENCE: 'fcourt'
@@ -58,8 +58,8 @@ spec:
             - name: DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: payment-service-secrets
-                  key: DATABASE_PASSWORD
+                  name: fcourt-postgres-superuser
+                  key: password
             - name: CLOUDINARY_URL
               valueFrom:
                 secretKeyRef:

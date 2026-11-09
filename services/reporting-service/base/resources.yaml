@@ -4,9 +4,9 @@ metadata:
   name: reporting-service-config
 data:
   SERVER_PORT: '8084'
-  REPORTING_DB_URL: '<SET_REPORTING_DB_URL>'
+  REPORTING_DB_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/reporting_db"
   REPORTING_DB_USER: 'postgres'
-  KAFKA_BOOTSTRAP_SERVERS: '<SET_KAFKA_BOOTSTRAP_SERVERS>'
+  KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
   REPORTING_CONSUMER_GROUP: 'reporting-service-v1'
   REPORTING_TIME_ZONE: 'Asia/Ho_Chi_Minh'
   FACILITY_URL: '<SET_FACILITY_URL>'
@@ -61,8 +61,8 @@ spec:
             - name: REPORTING_DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: reporting-service-secrets
-                  key: REPORTING_DB_PASSWORD
+                  name: fcourt-postgres-superuser
+                  key: password
           readinessProbe:
             httpGet:
               path: /actuator/health

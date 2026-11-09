@@ -4,8 +4,8 @@ metadata:
   name: voucher-service-config
 data:
   SERVER_PORT: '8086'
-  KAFKA_BOOTSTRAP_SERVERS: '<SET_KAFKA_BOOTSTRAP_SERVERS>'
-  DATABASE_URL: '<SET_DATABASE_URL>'
+  KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
+  DATABASE_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/voucher_db"
   DATABASE_USER: 'postgres'
   FACILITY_URL: '<SET_FACILITY_URL>'
   AUTH_JWK_SET_URI: '<SET_AUTH_JWK_SET_URI>'
@@ -57,8 +57,8 @@ spec:
             - name: DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: voucher-service-secrets
-                  key: DATABASE_PASSWORD
+                  name: fcourt-postgres-superuser
+                  key: password
             - name: VOUCHER_GRPC_TOKEN
               valueFrom:
                 secretKeyRef:
