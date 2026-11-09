@@ -5,6 +5,9 @@ metadata:
   namespace: data
 spec:
   instances: 1
+  enableSuperuserAccess: true
+  superuserSecret:
+    name: fcourt-postgres-superuser
   imageName: ghcr.io/cloudnative-pg/postgresql:16.4
   bootstrap:
     initdb:

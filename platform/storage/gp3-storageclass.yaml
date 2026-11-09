@@ -1,0 +1,16 @@
+# Default StorageClass for EBS (EKS only ships gp2). The EBS CSI driver add-on and its Pod Identity role come from
+# fcourt-infra (modules/eks). reclaimPolicy Delete so PVC deletion removes the volume and nothing lingers after teardown.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+    argocd.argoproj.io/sync-wave: "-1"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  fsType: ext4
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Delete

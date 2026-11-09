@@ -5,6 +5,7 @@ kind: Kustomization
 resources:
   # AppProjects
   - ../../projects
+  - ../../platform/storage
   # Platform add-ons shared with prod
   - ../../platform/aws-load-balancer-controller
   - ../../platform/external-secrets
