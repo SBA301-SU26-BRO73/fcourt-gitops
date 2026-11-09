@@ -1,13 +1,9 @@
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
-# Public ALB Ingress (shared group "fcourt-public") for a service that uses the
-# spring-service component. Name and backend port come from the service's
-# ConfigMap (label app.kubernetes.io/name and SERVER_PORT); the service base
-# must patch the public path(s) (add more paths with an "add" + "copy backend from paths/0" pair, see services/booking-service):
-#   patches:
-#     - target: {kind: Ingress}
-#       patch: |-
-#         - {op: replace, path: /spec/rules/0/http/paths/0/path, value: /api/example}
+# Public ALB Ingress (shared group "fcourt-public"). Used ONLY by gateway-service,
+# the single public entry point (path / -> gateway); every other service is
+# ClusterIP-only. Name and backend port come from the service's ConfigMap
+# (label app.kubernetes.io/name and SERVER_PORT).
 resources:
   - ingress.yaml
 replacements:
