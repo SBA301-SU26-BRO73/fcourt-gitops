@@ -9,9 +9,9 @@ data:
   KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
   DATABASE_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/voucher_db"
   DATABASE_USER: 'postgres'
-  FACILITY_URL: '<SET_FACILITY_URL>'
-  AUTH_JWK_SET_URI: '<SET_AUTH_JWK_SET_URI>'
-  AUTH_JWT_ISSUER: '<SET_AUTH_JWT_ISSUER>'
+  FACILITY_URL: 'http://facility-service:8083'
+  AUTH_JWK_SET_URI: 'http://auth-service:8081/.well-known/jwks.json'
+  AUTH_JWT_ISSUER: 'http://auth-service:8081'
   AUTH_JWT_AUDIENCE: 'fcourt'
   VOUCHER_GRPC_ENABLED: 'true'
   VOUCHER_GRPC_HOST: '127.0.0.1'

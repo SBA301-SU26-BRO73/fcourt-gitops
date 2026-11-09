@@ -7,7 +7,7 @@ components:
   - ../../../components/alb-ingress
 images:
   - name: spring-service
-    newName: <ECR_REGISTRY>/fcourt/slot-hold-engine
+    newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/slot-hold-engine
     newTag: dev
 patches:
   - target:
@@ -22,3 +22,9 @@ patches:
       - op: replace
         path: /spec/rules/0/http/paths/0/pathType
         value: Prefix
+  - target:
+      kind: Service
+    patch: |-
+      - op: add
+        path: /spec/ports/-
+        value: {name: grpc, port: 9087, targetPort: 9087, protocol: TCP}

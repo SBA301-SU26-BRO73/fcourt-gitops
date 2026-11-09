@@ -11,8 +11,8 @@ data:
   KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
   AUTH_GOOGLE_CLIENT_ID: ''
   AUTH_GOOGLE_JWK_SET_URI: 'https://www.googleapis.com/oauth2/v3/certs'
-  AUTH_JWK_SET_URI: '<SET_AUTH_JWK_SET_URI>'
-  AUTH_JWT_ISSUER: '<SET_AUTH_JWT_ISSUER>'
+  AUTH_JWK_SET_URI: 'http://auth-service:8081/.well-known/jwks.json'
+  AUTH_JWT_ISSUER: 'http://auth-service:8081'
   AUTH_JWT_AUDIENCE: 'fcourt'
   AUTH_JWT_KEY_ID: ''
   AUTH_JWT_ACCESS_TTL: '15m'

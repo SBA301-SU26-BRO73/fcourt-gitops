@@ -4,8 +4,8 @@ namespace: fcourt-prod
 resources:
   - ../../base
 images:
-  - name: <ECR_REGISTRY>/fcourt/subscription-service
-    newName: <ECR_REGISTRY>/fcourt/subscription-service
+  - name: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/subscription-service
+    newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/subscription-service
     newTag: <IMAGE_TAG>
 replicas:
   - name: subscription-service

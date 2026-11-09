@@ -4,9 +4,9 @@ namespace: fcourt-dev
 resources:
   - ../../base
 images:
-  - name: <ECR_REGISTRY>/fcourt/booking-service
-    newName: <ECR_REGISTRY>/fcourt/booking-service
-    newTag: <IMAGE_TAG>
+  - name: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/booking-service
+    newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/booking-service
+    newTag: dev
 replicas:
   - name: booking-service
     count: 1

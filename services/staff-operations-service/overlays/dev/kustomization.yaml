@@ -4,9 +4,9 @@ namespace: fcourt-dev
 resources:
   - ../../base
 images:
-  - name: <ECR_REGISTRY>/fcourt/staff-operations-service
-    newName: <ECR_REGISTRY>/fcourt/staff-operations-service
-    newTag: <IMAGE_TAG>
+  - name: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/staff-operations-service
+    newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/staff-operations-service
+    newTag: dev
 replicas:
   - name: staff-operations-service
     count: 1

@@ -7,7 +7,7 @@ components:
   - ../../../components/alb-ingress
 images:
   - name: spring-service
-    newName: <ECR_REGISTRY>/fcourt/subscription-service
+    newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/subscription-service
     newTag: dev
 patches:
   - path: deployment-env.yaml

@@ -4,8 +4,8 @@ namespace: fcourt-prod
 resources:
   - ../../base
 images:
-  - name: <ECR_REGISTRY>/fcourt/reporting-service
-    newName: <ECR_REGISTRY>/fcourt/reporting-service
+  - name: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/reporting-service
+    newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/reporting-service
     newTag: <IMAGE_TAG>
 replicas:
   - name: reporting-service

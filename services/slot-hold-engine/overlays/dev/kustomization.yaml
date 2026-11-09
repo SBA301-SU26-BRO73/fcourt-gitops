@@ -4,9 +4,9 @@ namespace: fcourt-dev
 resources:
   - ../../base
 images:
-  - name: <ECR_REGISTRY>/fcourt/slot-hold-engine
-    newName: <ECR_REGISTRY>/fcourt/slot-hold-engine
-    newTag: <IMAGE_TAG>
+  - name: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/slot-hold-engine
+    newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/slot-hold-engine
+    newTag: dev
 replicas:
   - name: slot-hold-engine
     count: 1

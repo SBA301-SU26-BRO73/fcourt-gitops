@@ -4,8 +4,8 @@ namespace: fcourt-prod
 resources:
   - ../../base
 images:
-  - name: <ECR_REGISTRY>/fcourt/payment-service
-    newName: <ECR_REGISTRY>/fcourt/payment-service
+  - name: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/payment-service
+    newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/payment-service
     newTag: <IMAGE_TAG>
 replicas:
   - name: payment-service

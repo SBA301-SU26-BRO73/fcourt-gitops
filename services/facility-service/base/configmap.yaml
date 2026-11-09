@@ -12,8 +12,8 @@ data:
   REDIS_HOST: "redis.data.svc.cluster.local"
   REDIS_PORT: '6379'
   FACILITY_REALTIME_ENABLED: 'false'
-  AUTH_JWK_SET_URI: '<SET_AUTH_JWK_SET_URI>'
-  AUTH_JWT_ISSUER: '<SET_AUTH_JWT_ISSUER>'
+  AUTH_JWK_SET_URI: 'http://auth-service:8081/.well-known/jwks.json'
+  AUTH_JWT_ISSUER: 'http://auth-service:8081'
   AUTH_JWT_AUDIENCE: 'fcourt'
   SUBSCRIPTION_BASE_URL: ''
   SUBSCRIPTION_DEFAULT_MAX_BRANCHES: '3'

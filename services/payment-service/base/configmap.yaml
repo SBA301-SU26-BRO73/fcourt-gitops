@@ -11,10 +11,10 @@ data:
   REDIS_HOST: "redis.data.svc.cluster.local"
   REDIS_PORT: '6379'
   KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
-  AUTH_JWK_SET_URI: '<SET_AUTH_JWK_SET_URI>'
-  AUTH_JWT_ISSUER: '<SET_AUTH_JWT_ISSUER>'
+  AUTH_JWK_SET_URI: 'http://auth-service:8081/.well-known/jwks.json'
+  AUTH_JWT_ISSUER: 'http://auth-service:8081'
   AUTH_JWT_AUDIENCE: 'fcourt'
   PAYMENT_EVENTS_ENABLED: 'true'
-  BOOKING_URL: '<SET_BOOKING_URL>'
-  FACILITY_URL: '<SET_FACILITY_URL>'
-  AUTH_URL: '<SET_AUTH_URL>'
+  BOOKING_URL: 'http://booking-service:8088'
+  FACILITY_URL: 'http://facility-service:8083'
+  AUTH_URL: 'http://auth-service:8081'

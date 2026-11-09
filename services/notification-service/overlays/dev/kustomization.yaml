@@ -4,9 +4,9 @@ namespace: fcourt-dev
 resources:
   - ../../base
 images:
-  - name: <ECR_REGISTRY>/fcourt/notification-service
-    newName: <ECR_REGISTRY>/fcourt/notification-service
-    newTag: <IMAGE_TAG>
+  - name: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/notification-service
+    newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/notification-service
+    newTag: dev
 replicas:
   - name: notification-service
     count: 1

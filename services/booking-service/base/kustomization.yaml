@@ -7,7 +7,7 @@ components:
   - ../../../components/alb-ingress
 images:
   - name: spring-service
-    newName: <ECR_REGISTRY>/fcourt/booking-service
+    newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/booking-service
     newTag: dev
 patches:
   - path: deployment-env.yaml
@@ -38,3 +38,9 @@ patches:
       - op: copy
         from: /spec/rules/0/http/paths/0/backend
         path: /spec/rules/0/http/paths/2/backend
+  - target:
+      kind: Service
+    patch: |-
+      - op: add
+        path: /spec/ports/-
+        value: {name: grpc, port: 9088, targetPort: 9088, protocol: TCP}

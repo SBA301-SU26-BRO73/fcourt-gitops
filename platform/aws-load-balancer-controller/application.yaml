@@ -13,9 +13,10 @@ spec:
     targetRevision: 3.6.2
     helm:
       values: |
-        clusterName: <EKS_CLUSTER_NAME>
-        region: <AWS_REGION>
-        vpcId: <VPC_ID>
+        clusterName: fcourt-dev
+        region: ap-southeast-1
+        # Pods cannot reach IMDS (hop limit 1), so the chart cannot discover the VPC. scripts/apply-terraform-outputs.sh fills this after terraform apply.
+        vpcId: ""
         serviceAccount:
           create: true
           name: aws-load-balancer-controller

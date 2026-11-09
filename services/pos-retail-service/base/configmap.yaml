@@ -9,12 +9,12 @@ data:
   POS_DATABASE_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/pos_retail_db"
   POS_DATABASE_USER: 'postgres'
   KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
-  AUTH_URL: '<SET_AUTH_URL>'
-  STAFF_URL: '<SET_STAFF_URL>'
-  FACILITY_URL: '<SET_FACILITY_URL>'
-  BOOKING_URL: '<SET_BOOKING_URL>'
-  AUTH_JWK_SET_URI: '<SET_AUTH_JWK_SET_URI>'
-  AUTH_JWT_ISSUER: '<SET_AUTH_JWT_ISSUER>'
+  AUTH_URL: 'http://auth-service:8081'
+  STAFF_URL: 'http://staff-operations-service:8090'
+  FACILITY_URL: 'http://facility-service:8083'
+  BOOKING_URL: 'http://booking-service:8088'
+  AUTH_JWK_SET_URI: 'http://auth-service:8081/.well-known/jwks.json'
+  AUTH_JWT_ISSUER: 'http://auth-service:8081'
   AUTH_JWT_AUDIENCE: 'fcourt'
   POS_DISPATCH_ENABLED: 'true'
   POS_EVENTS_TOPIC: 'fcourt.pos.events'
