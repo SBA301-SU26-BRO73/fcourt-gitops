@@ -4,46 +4,9 @@ resources:
   - configmap.yaml
 components:
   - ../../../components/spring-service
-  - ../../../components/alb-ingress
 images:
   - name: spring-service
     newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/discovery-service
     newTag: dev
 patches:
   - path: deployment-env.yaml
-  - target:
-      kind: Ingress
-    patch: |-
-      - op: add
-        path: /metadata/annotations/alb.ingress.kubernetes.io~1group.order
-        value: "10"
-      - op: replace
-        path: /spec/rules/0/http/paths/0/path
-        value: /api/public/branches
-      - op: replace
-        path: /spec/rules/0/http/paths/0/pathType
-        value: Exact
-      - op: add
-        path: /spec/rules/0/http/paths/-
-        value: {path: /api/public/branches/*/reviews, pathType: ImplementationSpecific}
-      - op: copy
-        from: /spec/rules/0/http/paths/0/backend
-        path: /spec/rules/0/http/paths/1/backend
-      - op: add
-        path: /spec/rules/0/http/paths/-
-        value: {path: /api/public/courts, pathType: Prefix}
-      - op: copy
-        from: /spec/rules/0/http/paths/0/backend
-        path: /spec/rules/0/http/paths/2/backend
-      - op: add
-        path: /spec/rules/0/http/paths/-
-        value: {path: /api/reviews, pathType: Prefix}
-      - op: copy
-        from: /spec/rules/0/http/paths/0/backend
-        path: /spec/rules/0/http/paths/3/backend
-      - op: add
-        path: /spec/rules/0/http/paths/-
-        value: {path: /api/admin/reviews, pathType: Prefix}
-      - op: copy
-        from: /spec/rules/0/http/paths/0/backend
-        path: /spec/rules/0/http/paths/4/backend

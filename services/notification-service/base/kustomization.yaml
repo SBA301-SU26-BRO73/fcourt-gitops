@@ -4,22 +4,9 @@ resources:
   - configmap.yaml
 components:
   - ../../../components/spring-service
-  - ../../../components/alb-ingress
 images:
   - name: spring-service
     newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/notification-service
     newTag: dev
 patches:
   - path: deployment-env.yaml
-  - target:
-      kind: Ingress
-    patch: |-
-      - op: add
-        path: /metadata/annotations/alb.ingress.kubernetes.io~1group.order
-        value: "10"
-      - op: replace
-        path: /spec/rules/0/http/paths/0/path
-        value: /devices
-      - op: replace
-        path: /spec/rules/0/http/paths/0/pathType
-        value: Prefix
