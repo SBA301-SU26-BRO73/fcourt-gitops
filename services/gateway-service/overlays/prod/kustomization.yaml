@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: fcourt-prod
+resources:
+  - ../../base
+images:
+  - name: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/gateway-service
+    newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/gateway-service
+    newTag: <IMAGE_TAG>
+replicas:
+  - name: gateway-service
+    count: 2
