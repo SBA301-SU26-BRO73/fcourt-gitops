@@ -24,3 +24,6 @@ data:
   AUTH_EVENTS_ENABLED: 'true'
   AUTH_EVENTS_TOPIC: 'fcourt.auth.events'
   AUTH_EVENTS_DELAY_MS: '1000'
+  EUREKA_URL: 'http://eureka-server:8761/eureka'
+  EUREKA_ENABLED: 'true'
+  EUREKA_INSTANCE_PREFER_IP_ADDRESS: 'true'

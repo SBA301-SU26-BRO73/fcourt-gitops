@@ -18,3 +18,6 @@ data:
   AUTH_JWT_AUDIENCE: 'fcourt'
   POS_DISPATCH_ENABLED: 'true'
   POS_EVENTS_TOPIC: 'fcourt.pos.events'
+  EUREKA_URL: 'http://eureka-server:8761/eureka'
+  EUREKA_ENABLED: 'true'
+  EUREKA_INSTANCE_PREFER_IP_ADDRESS: 'true'

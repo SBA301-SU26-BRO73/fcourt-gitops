@@ -18,3 +18,6 @@ data:
   BOOKING_URL: 'http://booking-service:8088'
   FACILITY_URL: 'http://facility-service:8083'
   AUTH_URL: 'http://auth-service:8081'
+  EUREKA_URL: 'http://eureka-server:8761/eureka'
+  EUREKA_ENABLED: 'true'
+  EUREKA_INSTANCE_PREFER_IP_ADDRESS: 'true'

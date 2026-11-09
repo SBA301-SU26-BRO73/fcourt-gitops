@@ -27,3 +27,6 @@ data:
   AUTH_JWT_ISSUER: 'http://auth-service:8081'
   AUTH_JWT_AUDIENCE: 'fcourt'
   FACILITY_URL: 'http://facility-service:8083'
+  EUREKA_URL: 'http://eureka-server:8761/eureka'
+  EUREKA_ENABLED: 'true'
+  EUREKA_INSTANCE_PREFER_IP_ADDRESS: 'true'

@@ -28,3 +28,6 @@ data:
   BOOKING_URL: 'http://booking-service:8088'
   DISCOVERY_CACHE_TTL_SECONDS: '5'
   BRANCH_UPDATED_TOPIC: 'facility.branch-updated.v1'
+  EUREKA_URL: 'http://eureka-server:8761/eureka'
+  EUREKA_ENABLED: 'true'
+  EUREKA_INSTANCE_PREFER_IP_ADDRESS: 'true'
