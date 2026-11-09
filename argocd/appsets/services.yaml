@@ -3,6 +3,8 @@ kind: ApplicationSet
 metadata:
   name: fcourt-services-dev
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '1'
 spec:
   generators:
     - git:
@@ -13,8 +15,6 @@ spec:
   template:
     metadata:
       name: 'fcourt-{{path[1]}}-dev'
-      annotations:
-        argocd.argoproj.io/sync-wave: '10'
     spec:
       project: services
       source:
