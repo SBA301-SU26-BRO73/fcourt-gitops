@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: fcourt-dev
+resources:
+  - ../../base
+images:
+  - name: <ECR_REGISTRY>/fcourt/booking-service
+    newName: <ECR_REGISTRY>/fcourt/booking-service
+    newTag: <IMAGE_TAG>
+replicas:
+  - name: booking-service
+    count: 1
+

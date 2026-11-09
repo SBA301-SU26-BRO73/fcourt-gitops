@@ -1,0 +1,172 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: facility-service-config
+data:
+  SERVER_PORT: '8083'
+  FACILITY_DB_URL: '<SET_FACILITY_DB_URL>'
+  FACILITY_DB_USER: 'postgres'
+  KAFKA_BOOTSTRAP_SERVERS: '<SET_KAFKA_BOOTSTRAP_SERVERS>'
+  REDIS_HOST: '<SET_REDIS_HOST>'
+  REDIS_PORT: '6387'
+  FACILITY_REALTIME_ENABLED: 'false'
+  AUTH_JWK_SET_URI: '<SET_AUTH_JWK_SET_URI>'
+  AUTH_JWT_ISSUER: '<SET_AUTH_JWT_ISSUER>'
+  AUTH_JWT_AUDIENCE: 'fcourt'
+  SUBSCRIPTION_BASE_URL: ''
+  SUBSCRIPTION_DEFAULT_MAX_BRANCHES: '3'
+  SUBSCRIPTION_DEFAULT_MAX_COURTS: '15'
+  FACILITY_IMAGES_MAX_PER_BRANCH: '10'
+  FACILITY_IMAGES_MAX_FILE_BYTES: '5242880'
+  CLOUDINARY_CLOUD_NAME: ''
+  DISCOVERY_BASE_URL: ''
+  FACILITY_RESERVATION_SWEEP_MS: '15000'
+  FACILITY_EVENTS_ENABLED: 'true'
+  BRANCH_UPDATED_TOPIC: 'facility.branch-updated.v1'
+  BRANCH_UPDATED_TOPIC_PARTITIONS: '3'
+  FACILITY_OUTBOX_DELAY_MS: '1000'
+  FACILITY_BOOTSTRAP_SNAPSHOTS: 'true'
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: facility-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: facility-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: facility-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: facility-service
+    spec:
+      serviceAccountName: facility-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: facility-service
+          image: <ECR_REGISTRY>/fcourt/facility-service:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8083
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: facility-service-config
+          env:
+            - name: FACILITY_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: facility-service-secrets
+                  key: FACILITY_DB_PASSWORD
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: facility-service-secrets
+                  key: REDIS_PASSWORD
+            - name: CLOUDINARY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: facility-service-secrets
+                  key: CLOUDINARY_URL
+            - name: CLOUDINARY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: facility-service-secrets
+                  key: CLOUDINARY_API_KEY
+            - name: CLOUDINARY_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: facility-service-secrets
+                  key: CLOUDINARY_API_SECRET
+            - name: DISCOVERY_INTERNAL_SLOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: facility-service-secrets
+                  key: DISCOVERY_INTERNAL_SLOT_TOKEN
+            - name: FACILITY_RESERVATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: facility-service-secrets
+                  key: FACILITY_RESERVATION_TOKEN
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 45
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: facility-service
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: facility-service
+  ports:
+    - name: http
+      port: 8083
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: facility-service
+  annotations:
+    alb.ingress.kubernetes.io/group.name: fcourt-public
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /actuator/health
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /api/facilities
+            pathType: Prefix
+            backend:
+              service:
+                name: facility-service
+                port:
+                  number: 8083
+

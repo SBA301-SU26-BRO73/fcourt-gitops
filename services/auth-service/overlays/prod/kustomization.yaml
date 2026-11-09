@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: fcourt-prod
+resources:
+  - ../../base
+images:
+  - name: <ECR_REGISTRY>/fcourt/auth-service
+    newName: <ECR_REGISTRY>/fcourt/auth-service
+    newTag: <IMAGE_TAG>
+replicas:
+  - name: auth-service
+    count: 2
+

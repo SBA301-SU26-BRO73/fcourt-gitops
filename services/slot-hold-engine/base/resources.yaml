@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: slot-hold-engine-config
+data:
+  SERVER_PORT: '8087'
+  REDIS_ADDRESS: '<SET_REDIS_ADDRESS>'
+  DISCOVERY_URL: '<SET_DISCOVERY_URL>'
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: slot-hold-engine
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slot-hold-engine
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: slot-hold-engine
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: slot-hold-engine
+    spec:
+      serviceAccountName: slot-hold-engine
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: slot-hold-engine
+          image: <ECR_REGISTRY>/fcourt/slot-hold-engine:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8087
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: slot-hold-engine-config
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: slot-hold-engine-secrets
+                  key: REDIS_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 45
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: slot-hold-engine
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: slot-hold-engine
+  ports:
+    - name: http
+      port: 8087
+      targetPort: http
+      protocol: TCP
+

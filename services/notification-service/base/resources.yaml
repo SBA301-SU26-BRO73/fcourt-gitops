@@ -1,0 +1,148 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notification-service-config
+data:
+  SERVER_PORT: '8091'
+  NOTIFICATION_DATABASE_URL: '<SET_NOTIFICATION_DATABASE_URL>'
+  NOTIFICATION_DATABASE_USER: 'postgres'
+  KAFKA_BOOTSTRAP_SERVERS: '<SET_KAFKA_BOOTSTRAP_SERVERS>'
+  NOTIFICATION_SMTP_HOST: '<SET_NOTIFICATION_SMTP_HOST>'
+  NOTIFICATION_SMTP_PORT: '587'
+  NOTIFICATION_SMTP_AUTH: 'true'
+  NOTIFICATION_SMTP_STARTTLS: 'true'
+  NOTIFICATION_ENABLED: 'true'
+  NOTIFICATION_TOPICS: 'fcourt.auth.events,fcourt.payment.events,fcourt.booking.events'
+  AUTH_JWK_SET_URI: '<SET_AUTH_JWK_SET_URI>'
+  AUTH_JWT_ISSUER: '<SET_AUTH_JWT_ISSUER>'
+  AUTH_JWT_AUDIENCE: 'fcourt'
+  PUSH_AWS_REGION: 'ap-southeast-1'
+  PUSH_SNS_PLATFORM_APPLICATION_ARN: ''
+  NOTIFICATION_MAIL_FROM: 'FCOURT <no-reply@fcourt.example>'
+  NOTIFICATION_RESET_PASSWORD_URL: '<SET_NOTIFICATION_RESET_PASSWORD_URL>'
+  NOTIFICATION_RETRY_ATTEMPTS: '3'
+  NOTIFICATION_RETRY_INTERVAL_MS: '2000'
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: notification-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notification-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: notification-service
+    spec:
+      serviceAccountName: notification-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: notification-service
+          image: <ECR_REGISTRY>/fcourt/notification-service:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8091
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: notification-service-config
+          env:
+            - name: NOTIFICATION_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: notification-service-secrets
+                  key: NOTIFICATION_DATABASE_PASSWORD
+            - name: NOTIFICATION_SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: notification-service-secrets
+                  key: NOTIFICATION_SMTP_USER
+            - name: NOTIFICATION_SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: notification-service-secrets
+                  key: NOTIFICATION_SMTP_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 45
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: notification-service
+  ports:
+    - name: http
+      port: 8091
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: notification-service
+  annotations:
+    alb.ingress.kubernetes.io/group.name: fcourt-public
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /actuator/health
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /devices
+            pathType: Prefix
+            backend:
+              service:
+                name: notification-service
+                port:
+                  number: 8091
+
