@@ -8,7 +8,7 @@ components:
 images:
   - name: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/auth-service
     newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/auth-service
-    newTag: dev
+    newTag: latest
 patches:
   - path: deployment-env.yaml
   # Point the container at the ECR image so CI can run: kustomize edit set image <repo>=<repo>:<tag>

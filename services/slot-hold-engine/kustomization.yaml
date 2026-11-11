@@ -8,7 +8,7 @@ components:
 images:
   - name: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/slot-hold-engine
     newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/slot-hold-engine
-    newTag: dev
+    newTag: latest
 patches:
   - target:
       kind: Service
