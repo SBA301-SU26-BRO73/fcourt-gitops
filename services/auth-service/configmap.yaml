@@ -27,3 +27,4 @@ data:
   STORAGE_S3_BUCKET: 'fcourt-prod-media-870853685410'
   STORAGE_S3_REGION: 'ap-southeast-1'
   STORAGE_PUBLIC_BASE_URL: 'https://fcourt-prod-media-870853685410.s3.ap-southeast-1.amazonaws.com'
+  STAFF_URL: 'http://staff-operations-service:8090'

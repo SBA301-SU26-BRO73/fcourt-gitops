@@ -8,3 +8,5 @@ data:
   SERVER_PORT: '8087'
   REDIS_ADDRESS: "redis://redis.data.svc.cluster.local:6379"
   DISCOVERY_URL: 'http://discovery-service:8085'
+  AUTH_JWK_SET_URI: 'http://auth-service:8081/.well-known/jwks.json'
+  STAFF_URL: 'http://staff-operations-service:8090'
