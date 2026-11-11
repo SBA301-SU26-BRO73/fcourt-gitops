@@ -4,7 +4,7 @@ metadata:
   name: strimzi
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: '0'
+    argocd.argoproj.io/sync-wave: '1'
 spec:
   project: platform
   source:
@@ -22,7 +22,7 @@ spec:
       - CreateNamespace=true
       - SkipDryRunOnMissingResource=true
     retry:
-      limit: 5
+      limit: -1
       backoff:
         duration: 5s
         factor: 2
