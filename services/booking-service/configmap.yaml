@@ -12,7 +12,7 @@ data:
   REDIS_HOST: 'redis.data.svc.cluster.local'
   REDIS_PORT: '6379'
   SPRING_PROFILES_ACTIVE: 'realtime'
-  SLOT_ALLOWED_ORIGINS: 'http://localhost:5173,http://localhost:4173,http://localhost:3000,http://localhost:8080,http://k8s-fcourtpublic-2e318e4401-1964288907.ap-southeast-1.elb.amazonaws.com'
+  SLOT_ALLOWED_ORIGINS: 'https://fcourt.donan.site,http://localhost:5173,http://localhost:4173,http://localhost:3000,http://localhost:8080,http://k8s-fcourtpublic-2e318e4401-1964288907.ap-southeast-1.elb.amazonaws.com'
   AUTH_JWK_SET_URI: 'http://auth-service:8081/.well-known/jwks.json'
   AUTH_JWT_ISSUER: 'http://auth-service:8081'
   AUTH_JWT_AUDIENCE: 'fcourt'
