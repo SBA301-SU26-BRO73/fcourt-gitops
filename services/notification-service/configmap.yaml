@@ -15,6 +15,8 @@ data:
   NOTIFICATION_SMTP_STARTTLS: 'true'
   NOTIFICATION_ENABLED: 'true'
   NOTIFICATION_TOPICS: 'fcourt.auth.events,fcourt.payment.events,fcourt.booking.events'
+  FACILITY_URL: 'http://facility-service:8083'
+  STAFF_URL: 'http://staff-operations-service:8090'
   AUTH_JWK_SET_URI: 'http://auth-service:8081/.well-known/jwks.json'
   AUTH_JWT_ISSUER: 'http://auth-service:8081'
   AUTH_JWT_AUDIENCE: 'fcourt'
