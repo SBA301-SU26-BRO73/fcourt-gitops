@@ -10,6 +10,9 @@ spec:
   superuserSecret:
     name: fcourt-postgres-superuser
   imageName: ghcr.io/cloudnative-pg/postgresql:16.4
+  postgresql:
+    parameters:
+      max_connections: "250"
   storage:
     storageClass: gp3
     size: 5Gi
