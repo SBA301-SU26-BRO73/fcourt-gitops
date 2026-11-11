@@ -5,6 +5,8 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: '1'
+    # CNPG webhook fills defaults into Cluster.spec; compare only fields we manage.
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
 spec:
   project: platform
   source:
@@ -21,6 +23,7 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - SkipDryRunOnMissingResource=true
+      - ServerSideApply=true
     retry:
       limit: -1
       backoff:

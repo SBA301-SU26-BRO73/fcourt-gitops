@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Installs Argo CD (pinned Helm chart, dex and notifications off), applies the root Application, then aligns
-# the Load Balancer Controller webhook CA. Run once per new cluster.
+# the Load Balancer Controller webhook CA and points the CloudFront API origin at the new ALB. Run once per new cluster.
 #
 #   bash scripts/bootstrap-argocd.sh
 #
@@ -39,6 +39,14 @@ kubectl apply -n argocd -f "$root_dir/argocd/root-app.yaml"
 
 # Wait for the Load Balancer Controller and align its webhook CA; otherwise the Ingress sync fails with x509.
 bash "$root_dir/scripts/fix-lb-webhook-ca.sh"
+
+# CloudFront reaches the API through origin.<web domain>, a CNAME to the ALB, which changes on every new cluster.
+origin_script="$root_dir/../fcourt-infra/scripts/update-origin-record.sh"
+if [ -f "$origin_script" ]; then
+  sh "$origin_script"
+else
+  echo "fcourt-infra not found next to this repo: run fcourt-infra/scripts/update-origin-record.sh once the gateway Ingress has an address."
+fi
 
 echo "Argo CD installed. UI: kubectl -n argocd port-forward svc/argocd-server 8080:80"
 echo "Admin password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath={.data.password} | base64 -d"
