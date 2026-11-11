@@ -17,9 +17,24 @@ spec:
         region: ap-southeast-1
         # Pods cannot reach IMDS (hop limit 1), so the chart cannot discover the VPC. scripts/apply-terraform-outputs.sh fills this after terraform apply.
         vpcId: ""
+        replicaCount: 1
+        enableServiceMutatorWebhook: false
         serviceAccount:
           create: true
           name: aws-load-balancer-controller
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - '.webhooks[]?.clientConfig.caBundle'
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - '.webhooks[]?.clientConfig.caBundle'
+    - kind: Secret
+      name: aws-load-balancer-tls
+      jqPathExpressions:
+        - '.data'
   destination:
     server: https://kubernetes.default.svc
     namespace: kube-system
@@ -29,6 +44,7 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
