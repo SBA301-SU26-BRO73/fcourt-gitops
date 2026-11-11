@@ -33,15 +33,16 @@ docs/adr/                         # quyết định kiến trúc
 scripts/bootstrap-argocd.sh  -->  argocd/root-app.yaml  (Application fcourt-root, path argocd)
                                        |
                                        |- wave -1  AppProjects (platform, services), StorageClass gp3
-                                       |- wave  0  Applications nền tảng:
-                                       |           aws-load-balancer-controller, cloudnative-pg (+operator),
-                                       |           strimzi (+operator), redis
-                                       '- wave  1  ApplicationSet fcourt-services
+                                       |- wave  0  operator + hạ tầng:
+                                       |           aws-load-balancer-controller, cloudnative-pg-operator,
+                                       |           strimzi-operator, redis
+                                       |- wave  1  CR của operator: cloudnative-pg (Cluster), strimzi (Kafka)
+                                       '- wave  2  ApplicationSet fcourt-services
                                                    --> Application fcourt-<svc> cho mỗi services/* (trừ _components)
                                                        namespace fcourt-prod, automated prune + selfHeal
 ```
 
-ApplicationSet chỉ được tạo sau khi các Application wave 0 healthy. Các App con sau đó reconcile song song; service tự retry kết nối DB/Kafka. Root và mọi App con đều có retry backoff giới hạn. Instance CloudNativePG/Strimzi dùng `SkipDryRunOnMissingResource=true` để CR được chấp nhận trước khi CRD của operator tồn tại.
+Mỗi wave chỉ bắt đầu khi wave trước healthy (Argo CD có health check Lua cho Application, cấu hình trong `argocd/values.yaml`). Hai App CR (wave 1) retry không giới hạn (backoff tối đa 3m) trong lúc CRD/operator còn khởi động. Các App con sau đó reconcile song song; service tự retry kết nối DB/Kafka. Root và các App còn lại có retry backoff giới hạn. Instance CloudNativePG/Strimzi dùng `SkipDryRunOnMissingResource=true` để CR được chấp nhận trước khi CRD của operator tồn tại.
 
 ## Luồng runtime
 

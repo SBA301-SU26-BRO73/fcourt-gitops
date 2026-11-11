@@ -18,13 +18,16 @@ spec:
                 secretKeyRef:
                   name: subscription-service-secrets
                   key: PAYOS_CLIENT_ID
+                  optional: true
             - name: PAYOS_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: subscription-service-secrets
                   key: PAYOS_API_KEY
+                  optional: true
             - name: PAYOS_CHECKSUM_KEY
               valueFrom:
                 secretKeyRef:
                   name: subscription-service-secrets
                   key: PAYOS_CHECKSUM_KEY
+                  optional: true

@@ -12,7 +12,7 @@ spec:
     - broker
   storage:
     type: persistent-claim
-    size: 10Gi
+    size: 5Gi
     class: gp3
     deleteClaim: false
   resources:
@@ -57,3 +57,8 @@ spec:
   entityOperator:
     topicOperator: {}
     userOperator: {}
+    template:
+      topicOperatorContainer:
+        env:
+          - name: STRIMZI_USE_FINALIZERS
+            value: "false"
