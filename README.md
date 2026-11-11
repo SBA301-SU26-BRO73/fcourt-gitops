@@ -22,7 +22,7 @@ platform/
 services/
   _components/spring-service/     # Deployment, Service, ServiceAccount dùng chung
   _components/alb-ingress/        # Ingress ALB công khai (chỉ gateway dùng)
-  <service>/                      # kustomization.yaml, configmap.yaml, deployment-env.yaml (nếu có secret)
+  <service>/                      # kustomization.yaml, config.env, deployment-env.yaml (nếu có secret)
 scripts/                          # bootstrap-argocd.sh, create-secrets.sh, apply-terraform-outputs.sh, validate.sh, secrets.example/
 docs/adr/                         # quyết định kiến trúc
 ```
@@ -72,13 +72,15 @@ kubectl -n data port-forward svc/fcourt-kafka-kafka-bootstrap 9092:9092
 
 `services/_components/spring-service` chứa Deployment, Service, ServiceAccount dùng chung (non-root, root filesystem read-only, probe `/actuator/health`, resource, startupProbe 5 phút). Tên resource, `envFrom` và port được điền bằng Kustomize replacements từ ConfigMap của service (label `app.kubernetes.io/name`, `metadata.name`, `SERVER_PORT`). `services/<svc>/` chỉ chứa:
 
-- `configmap.yaml`: `<svc>-config` với label `app.kubernetes.io/name: <svc>`, `SERVER_PORT` và biến môi trường Spring.
+- `config.env`: các dòng `KEY=VALUE` (không thêm dấu nháy), gồm `SERVER_PORT` và biến môi trường Spring; chú thích nằm trên dòng riêng.
 - `deployment-env.yaml` (tuỳ chọn): các `env` tham chiếu Secret `<svc>-secrets`.
-- `kustomization.yaml`: namespace `fcourt-prod`, components, mục `images:` cho `870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/<svc>` và một patch gắn image đó vào container để `kustomize edit set image` hoạt động.
+- `kustomization.yaml`: namespace `fcourt-prod`, components, `configMapGenerator` tên logic `<svc>-config` (`behavior: create`, `envs: [config.env]`, label `app.kubernetes.io/name: <svc>`), mục `images:` cho `870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/<svc>` và một patch gắn image đó vào container để `kustomize edit set image` hoạt động.
+
+Kustomize thêm content hash vào tên ConfigMap và tự cập nhật `envFrom.configMapRef.name` qua component. Khi giá trị trong `config.env` thay đổi, pod template đổi nên Deployment tự rollout khi Argo CD sync. Không tắt name suffix hash. Kết quả so sánh cả 13 service: [configmap-rollout-verification.md](docs/configmap-rollout-verification.md). Đề xuất TLS cho lỗi staff walk-in A11: [a11-counter-grpc-tls-proposal.md](docs/a11-counter-grpc-tls-proposal.md).
 
 ## Thêm một service
 
-1. Tạo `services/<svc>/configmap.yaml` (port chưa dùng) và `kustomization.yaml` (copy từ service có sẵn, đổi tên và image).
+1. Tạo `services/<svc>/config.env` (port chưa dùng) và `kustomization.yaml` (copy từ service có sẵn, đổi tên generator, label và image).
 2. Cần secret thì thêm `deployment-env.yaml` và key vào `scripts/secrets.example/`.
 3. Thêm route và URL instance của service trong `gateway-service` ở fcourt-backend. Không thêm Ingress.
 4. `bash scripts/validate.sh`. ApplicationSet tự phát hiện `services/*`.

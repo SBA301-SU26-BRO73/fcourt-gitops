@@ -4,7 +4,7 @@ kind: Component
 # service. Resources use the placeholder name "spring-service"; the
 # replacements below overwrite it with values read from the service's own
 # ConfigMap, so a service base only has to provide:
-#   - a ConfigMap named "<service>-config" that carries the label
+#   - a configMapGenerator named "<service>-config" that carries the label
 #     app.kubernetes.io/name=<service> and the key SERVER_PORT
 #   - an `images` entry that maps "spring-service" to the real image
 #   - optionally a Deployment patch with `env` (secret references)
@@ -35,7 +35,8 @@ replacements:
         fieldPaths:
           - metadata.name
           - spec.selector.[app.kubernetes.io/name]
-  # ConfigMap name -> envFrom reference.
+  # Logical ConfigMap name -> envFrom reference; Kustomize nameReference then
+  # adds the generated content hash to both names, rolling pods on data changes.
   - source:
       kind: ConfigMap
       fieldPath: metadata.name

@@ -1,8 +1,14 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: fcourt-prod
-resources:
-- configmap.yaml
+configMapGenerator:
+- name: notification-service-config
+  behavior: create
+  envs:
+  - config.env
+  options:
+    labels:
+      app.kubernetes.io/name: notification-service
 components:
 - ../_components/spring-service
 images:

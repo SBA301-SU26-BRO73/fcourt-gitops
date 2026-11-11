@@ -19,14 +19,14 @@ media_bucket=$(val media_bucket_name)
 media_url=$(val media_public_base_url)
 
 alb=platform/aws-load-balancer-controller/application.yaml
-notif=services/notification-service/configmap.yaml
+notif=services/notification-service/config.env
 sed -i "s|^\(        vpcId: \).*|\1\"$vpc_id\"|" "$root_dir/$alb"
-sed -i "s|^\(  PUSH_SNS_PLATFORM_APPLICATION_ARN: \).*|\1'$sns_arn'|" "$root_dir/$notif"
+sed -i "s|^PUSH_SNS_PLATFORM_APPLICATION_ARN=.*|PUSH_SNS_PLATFORM_APPLICATION_ARN=$sns_arn|" "$root_dir/$notif"
 
 media_files=()
 for svc in auth facility discovery payment booking; do
-  cm="services/$svc-service/configmap.yaml"
-  sed -i -e "s|^\(  STORAGE_S3_BUCKET: \).*|\1'$media_bucket'|" -e "s|^\(  STORAGE_PUBLIC_BASE_URL: \).*|\1'$media_url'|" "$root_dir/$cm"
+  cm="services/$svc-service/config.env"
+  sed -i -e "s|^STORAGE_S3_BUCKET=.*|STORAGE_S3_BUCKET=$media_bucket|" -e "s|^STORAGE_PUBLIC_BASE_URL=.*|STORAGE_PUBLIC_BASE_URL=$media_url|" "$root_dir/$cm"
   media_files+=("$cm")
 done
 
