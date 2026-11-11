@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: facility-service
+spec:
+  template:
+    spec:
+      containers:
+        - name: facility-service
+          env:
+            - name: FACILITY_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: facility-service-secrets
+                  key: FACILITY_DB_PASSWORD
+            - name: DISCOVERY_INTERNAL_SLOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: facility-service-secrets
+                  key: DISCOVERY_INTERNAL_SLOT_TOKEN
+            - name: FACILITY_RESERVATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: facility-service-secrets
+                  key: FACILITY_RESERVATION_TOKEN

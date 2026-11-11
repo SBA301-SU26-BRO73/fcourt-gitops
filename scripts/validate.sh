@@ -22,23 +22,21 @@ render() {
   count=$((count + 1))
 }
 
-echo "== Bootstrap (one root Application per cluster) =="
-for dir in bootstrap/*/; do render "${dir%/}"; done
+echo "== Argo CD content (root Application path) =="
+render argocd
 
-echo "== Cluster entry points =="
-for dir in clusters/*/; do render "${dir%/}"; done
-
-echo "== Platform add-ons and dev-only data (Application wrappers) =="
-for dir in platform/*/ platform/dev-data/*/; do
+echo "== Platform (Application wrappers and manifests synced by child Applications) =="
+for dir in platform/*/ platform/*/manifests/; do
   [ -f "$dir/kustomization.yaml" ] && render "${dir%/}"
 done
 
-echo "== Dev-only data manifests synced by child Applications =="
-for dir in platform/dev-data/*/*/; do
-  [ -f "$dir/kustomization.yaml" ] && render "${dir%/}"
+echo "== Services =="
+deployments=0
+for dir in services/*/; do
+  case "$dir" in services/_components/) continue;; esac
+  render "${dir%/}"
+  deployments=$((deployments + $("${build[@]}" "${dir%/}" | grep -c '^kind: Deployment')))
 done
-
-echo "== Services (every overlay) =="
-for dir in services/*/overlays/*/; do render "${dir%/}"; done
+echo "Deployments rendered: $deployments"
 
 echo "Validation passed: $count Kustomize targets rendered."

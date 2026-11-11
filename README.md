@@ -1,95 +1,65 @@
 # FCourt GitOps
 
-Kubernetes configuration that Argo CD syncs to the FCourt EKS clusters (dev and prod): 12 Spring Boot services, the Spring Cloud pair (`eureka-server` registry and `gateway-service`, the only public entry point) and the platform add-ons they need. Kustomize everywhere; Helm charts are installed by Argo CD Applications with pinned versions.
+Cấu hình Kubernetes mà Argo CD đồng bộ vào cluster EKS `fcourt-prod` (một môi trường duy nhất). Gồm 12 Spring Boot service và `gateway-service` (điểm vào công khai duy nhất), cùng các add-on nền tảng: AWS Load Balancer Controller, StorageClass gp3, PostgreSQL (CloudNativePG), Kafka (Strimzi), Redis. Dùng Kustomize; Helm chart được cài bởi Argo CD Application với version cố định. Không có Eureka: service gọi nhau qua Kubernetes Service DNS.
 
-Repository split (see `docs/adr/0001-three-repositories.md`): the backend repo holds source code and image CI, `fcourt-infra` (Terraform) creates EKS, networking, IAM, Pod Identity associations and the prod managed data services, and this repo holds manifests and the image tag in each overlay. No real secrets are stored in Git.
+Phân chia repo (xem `docs/adr/0001-three-repositories.md`): repo backend giữ code và CI image; `fcourt-infra` (Terraform, root `envs/prod`) tạo EKS, VPC, IAM, Pod Identity, S3 và SNS; repo này giữ manifest và image tag của từng service. Không lưu secret thật trong Git.
 
-## Layout
+## Cấu trúc
 
 ```text
-bootstrap/
-  dev/root-app.yaml            # root Application for the dev cluster  -> clusters/dev
-  prod/root-app.yaml           # root Application for the prod cluster -> clusters/prod
-clusters/                      # per-cluster entry points: what each cluster runs
-  dev/
-    kustomization.yaml         #   projects + shared add-ons + dev-only data + services
-    services-appset.yaml       #   ApplicationSet: one App per services/*/overlays/dev
-    platform-project-dev.patch.yaml  # dev-only additions to the platform AppProject
-  prod/
-    kustomization.yaml         #   projects + shared add-ons + services (no in-cluster data)
-    services-appset.yaml       #   ApplicationSet: one App per services/*/overlays/prod
-projects/                      # AppProjects platform and services (shared by both clusters)
+argocd/
+  values.yaml              # Helm values cho Argo CD
+  root-app.yaml            # Application gốc duy nhất (path: argocd), apply tay một lần
+  kustomization.yaml       # nội dung root app: projects, platform, services ApplicationSet
+  projects.yaml            # AppProject platform + services
+  services-appset.yaml     # ApplicationSet: một App cho mỗi services/*
 platform/
-  aws-load-balancer-controller/  # shared add-ons, one Application (Helm chart) each
-  external-secrets/
-  metrics-server/
-  dev-data/                    # DEV ONLY: in-cluster data; prod uses RDS / MSK / ElastiCache
-    cloudnative-pg/            #   operator-application.yaml, cluster-application.yaml, cluster/
-    strimzi/                   #   operator-application.yaml, kafka-application.yaml, kafka/
-    redis/                     #   redis-application.yaml, manifests/
-components/
-  spring-service/              # shared Deployment, Service, ServiceAccount, probes, resources, security context
-  alb-ingress/                 # public ALB Ingress (group fcourt-public); used only by gateway-service
-services/<service>/
-  base/                        # configmap.yaml, kustomization.yaml, optional deployment-env.yaml
-  overlays/dev/                # namespace fcourt-dev, image tag, replicas
-  overlays/prod/               # namespace fcourt-prod, image tag, replicas
-docs/adr/                      # architecture decision records
-scripts/validate.sh            # renders every Kustomize entry point
+  aws-load-balancer-controller/   # Helm chart qua Application
+  storage/                        # StorageClass gp3 (mặc định)
+  postgres/                       # operator + cluster CloudNativePG (manifests/)
+  kafka/                          # operator + Kafka + topics Strimzi (manifests/)
+  redis/                          # Redis (manifests/)
+services/
+  _components/spring-service/     # Deployment, Service, ServiceAccount dùng chung
+  _components/alb-ingress/        # Ingress ALB công khai (chỉ gateway dùng)
+  <service>/                      # kustomization.yaml, configmap.yaml, deployment-env.yaml (nếu có secret)
+scripts/                          # bootstrap-argocd.sh, create-secrets.sh, apply-terraform-outputs.sh, validate.sh, secrets.example/
+docs/adr/                         # quyết định kiến trúc
 ```
 
-## How bootstrap works
-
-Each cluster gets exactly one root Application, applied once by hand after Argo CD is installed:
-
-```sh
-kubectl create namespace argocd                            # if Argo CD is not installed yet
-kubectl apply -n argocd -f bootstrap/dev/root-app.yaml     # dev cluster
-kubectl apply -n argocd -f bootstrap/prod/root-app.yaml    # prod cluster
-```
-
-The root Application syncs `clusters/<env>`, which contains everything Argo CD needs for that cluster, ordered by sync wave:
+## Luồng Argo CD
 
 ```text
-fcourt-root (path clusters/<env>)
-  |- wave -1  AppProjects (platform, services)
-  |- wave  0  platform Applications (add-ons; in dev also operators and in-cluster data)
-  |- wave  1  eureka-server ApplicationSet  -> fcourt-eureka-server-<env>
-  |- wave  2  services ApplicationSet       -> one Application per services/*/overlays/<env> (eureka-server and gateway-service excluded)
-  '- wave  3  gateway-service ApplicationSet -> fcourt-gateway-service-<env>
+scripts/bootstrap-argocd.sh  -->  argocd/root-app.yaml  (Application fcourt-root, path argocd)
+                                       |
+                                       |- wave -1  AppProjects (platform, services), StorageClass gp3
+                                       |- wave  0  Applications nền tảng:
+                                       |           aws-load-balancer-controller, cloudnative-pg (+operator),
+                                       |           strimzi (+operator), redis
+                                       '- wave  1  ApplicationSet fcourt-services
+                                                   --> Application fcourt-<svc> cho mỗi services/* (trừ _components)
+                                                       namespace fcourt-prod, automated prune + selfHeal
 ```
 
-Argo CD waits for the wave 0 Applications to be healthy before it creates the ApplicationSets. An ApplicationSet does not wait for the Applications it generates, so the ordering eureka, services, gateway is best effort: the ApplicationSets are created in that order, but the Apps still reconcile concurrently. It is safe anyway: Eureka clients and the gateway retry registration and refresh the registry, and the 5-minute `startupProbe` covers a slow Eureka start. Retry with bounded backoff is set on the root and all child Applications. In dev, the CloudNativePG and Strimzi instance Applications use `SkipDryRunOnMissingResource=true` so their custom resources are accepted before the operator CRDs exist.
+ApplicationSet chỉ được tạo sau khi các Application wave 0 healthy. Các App con sau đó reconcile song song; service tự retry kết nối DB/Kafka. Root và mọi App con đều có retry backoff giới hạn. Instance CloudNativePG/Strimzi dùng `SkipDryRunOnMissingResource=true` để CR được chấp nhận trước khi CRD của operator tồn tại.
 
-Bring-up order for dev is in "Dev bring-up" below. Pod Identity associations come from `fcourt-infra`.
-
-## Dev vs prod
-
-| | dev | prod |
-|---|---|---|
-| Entry point | `clusters/dev` | `clusters/prod` |
-| Services namespace | `fcourt-dev` (1 replica each) | `fcourt-prod` (2 replicas each; `eureka-server` 1, `gateway-service` 2) |
-| PostgreSQL | CloudNativePG in namespace `data` | RDS (Terraform) |
-| Kafka | Strimzi in namespace `data` | MSK (Terraform) |
-| Redis | Deployment in namespace `data` | ElastiCache (Terraform) |
-| Shared add-ons | ALB controller, External Secrets, metrics-server | same |
-
-Prod is a skeleton: its overlays render, but service ConfigMaps still carry the dev in-cluster endpoints (`*.data.svc.cluster.local`) and the `fcourt-postgres-superuser` secret reference, because those values live in `services/<service>/base/`. Before enabling prod, move them into `overlays/prod` (or a patch) and point them at RDS, MSK and ElastiCache.
-
-### Dev in-cluster data
+## Luồng runtime
 
 ```text
-fcourt-dev services -- PostgreSQL  fcourt-postgres-rw.data.svc.cluster.local:5432
-                    |- Redis       redis.data.svc.cluster.local:6379
-                    '- Kafka       fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092
+client --> ALB (group fcourt-public, HTTP 80) --> gateway-service:8080 --http://<svc>:<port>--> các service (ClusterIP)
+
+service --> PostgreSQL  fcourt-postgres-rw.data.svc.cluster.local:5432            (CloudNativePG, ns data)
+        |-> Kafka       fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092  (Strimzi, ns data)
+        |-> Redis       redis.data.svc.cluster.local:6379
+        '-> S3 (media bucket) và SNS (push) qua EKS Pod Identity, ServiceAccount = tên service
 ```
 
-- PostgreSQL creates 11 databases (`auth_db`, `booking_db`, `discovery_db`, `facility_db`, `notification_db`, `payment_db`, `pos_retail_db`, `reporting_db`, `staff_db`, `subscription_db`, `voucher_db`). Services connect as `postgres` with the password from Secret `fcourt-postgres-superuser`, key `password`. This is one shared high-privilege account, acceptable for dev only.
-- Redis uses `emptyDir`, has no password and loses its data on restart.
-- Kafka is plain internal, auto-create is off, and topics (events and DLT) are declared as `KafkaTopic` resources in `platform/dev-data/strimzi/kafka/topics.yaml`.
-- PostgreSQL and Kafka use single-AZ gp3 PVCs, with no HA and no backups. Do not reuse this setup in prod.
+- Gateway kiểm tra JWT (JWKS từ `auth-service`) rồi route theo path tới `http://<svc>:<port>` (instance tĩnh cấu hình trong backend). Mọi service khác chỉ là ClusterIP.
+- Pod Identity association do `fcourt-infra` tạo; ServiceAccount có cùng tên với service (từ `_components/spring-service`).
+- S3: `auth`, `discovery`, `facility`, `booking`, `payment` có `STORAGE_S3_BUCKET`, `STORAGE_S3_REGION`, `STORAGE_PUBLIC_BASE_URL` (bucket `fcourt-prod-media-870853685410`).
+- PostgreSQL tạo 11 database; service kết nối bằng user `postgres`, mật khẩu từ Secret `fcourt-postgres-superuser` (key `password`). Redis dùng `emptyDir`, không mật khẩu. Kafka plain nội bộ, topic khai báo bằng `KafkaTopic` trong `platform/kafka/manifests/topics.yaml`. Không HA, không backup.
 
-Debug access:
+Debug:
 
 ```sh
 kubectl -n data port-forward svc/fcourt-postgres-rw 5432:5432
@@ -97,98 +67,61 @@ kubectl -n data port-forward svc/redis 6379:6379
 kubectl -n data port-forward svc/fcourt-kafka-kafka-bootstrap 9092:9092
 ```
 
-## How a service is built
+## Một service được dựng thế nào
 
-`components/spring-service` holds the Deployment, Service and ServiceAccount shared by all services: non-root user, read-only root filesystem, `/tmp` emptyDir, `/actuator/health` probes, resource requests and limits. It uses placeholder names and fills them in from the service's own ConfigMap with Kustomize replacements: the `app.kubernetes.io/name` label gives every resource name and selector, `metadata.name` gives the `envFrom` reference, and `SERVER_PORT` gives the container and Service port. `components/alb-ingress` does the same for the one public Ingress, which only `gateway-service` uses; every other service is ClusterIP-only.
+`services/_components/spring-service` chứa Deployment, Service, ServiceAccount dùng chung (non-root, root filesystem read-only, probe `/actuator/health`, resource, startupProbe 5 phút). Tên resource, `envFrom` và port được điền bằng Kustomize replacements từ ConfigMap của service (label `app.kubernetes.io/name`, `metadata.name`, `SERVER_PORT`). `services/<svc>/` chỉ chứa:
 
-A service base therefore contains only what is specific to it:
+- `configmap.yaml`: `<svc>-config` với label `app.kubernetes.io/name: <svc>`, `SERVER_PORT` và biến môi trường Spring.
+- `deployment-env.yaml` (tuỳ chọn): các `env` tham chiếu Secret `<svc>-secrets`.
+- `kustomization.yaml`: namespace `fcourt-prod`, components, mục `images:` cho `870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/<svc>` và một patch gắn image đó vào container để `kustomize edit set image` hoạt động.
 
-- `configmap.yaml`: `<service>-config`, labelled `app.kubernetes.io/name: <service>`, with `SERVER_PORT` and the Spring environment variables.
-- `deployment-env.yaml` (optional): `env` entries that reference Secrets.
-- `kustomization.yaml`: the components, the image name. Only gateway-service also has `components/alb-ingress`.
+## Thêm một service
 
-## Add a service
+1. Tạo `services/<svc>/configmap.yaml` (port chưa dùng) và `kustomization.yaml` (copy từ service có sẵn, đổi tên và image).
+2. Cần secret thì thêm `deployment-env.yaml` và key vào `scripts/secrets.example/`.
+3. Thêm route và URL instance của service trong `gateway-service` ở fcourt-backend. Không thêm Ingress.
+4. `bash scripts/validate.sh`. ApplicationSet tự phát hiện `services/*`.
 
-1. Create `services/<service>/base/configmap.yaml`, named `<service>-config`, with label `app.kubernetes.io/name: <service>`, `SERVER_PORT` and the variables from the service's `application.yml`. Pick a port no other service uses.
-2. If the service needs secrets, add `services/<service>/base/deployment-env.yaml` (copy one from an existing service). Secrets are Kubernetes Secrets named `<service>-secrets`.
-3. Create `services/<service>/base/kustomization.yaml` (copy an existing one). Change the image `newName` to `870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/<service>`. Do not add an Ingress: the service is reached through the gateway. Add its route (path to `lb://<eureka-name>`) in `gateway-service` in fcourt-backend and to the table below, and set `EUREKA_URL`, `EUREKA_ENABLED=true`, `EUREKA_INSTANCE_PREFER_IP_ADDRESS=true` in the ConfigMap.
-4. Create `services/<service>/overlays/dev/kustomization.yaml` and `overlays/prod/kustomization.yaml` (copy an existing pair and replace the service name).
-5. Run `bash scripts/validate.sh`.
+## Cập nhật image
 
-No other registration is needed: the ApplicationSets discover `services/*/overlays/<env>`.
+CI của fcourt-backend (`build-push-images.yml`) push `:<short-sha>` và `:dev`, rồi chạy `kustomize edit set image <repo>=<repo>:<short-sha>` trong `services/<svc>` và commit vào `main`; Argo CD sync commit mới. Không dùng `latest`.
 
-## Image updates
+## Bring-up (sau `terraform apply` của `fcourt-infra/envs/prod`)
 
-Images are `870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/<service>:<tag>`; the repositories live in `fcourt-infra/envs/shared` and survive dev teardowns. `overlays/dev` starts on the moving tag `dev`. CI (fcourt-backend, workflow `build-push-images.yml`) pushes `:<short-sha>` and `:dev`, then runs `kustomize edit set image <repo>=<repo>:<short-sha>` in `services/<service>/overlays/dev` and commits to `main`; Argo CD syncs the new commit. Prod overlays keep `<IMAGE_TAG>` until prod is enabled. Never use `latest`.
+Chạy từ repo này với `AWS_PROFILE=tpn12`, `kubectl` trỏ vào cluster (`aws eks update-kubeconfig --name fcourt-prod`), có `helm`, `terraform`, `jq`.
 
-## Traffic flow, gateway routes and assumptions
+1. `bash scripts/apply-terraform-outputs.sh` đọc output `gitops_values`, ghi VPC id (ALB controller), SNS ARN (notification-service), bucket và public base URL S3, rồi push lên `main`.
+2. `bash scripts/create-secrets.sh --generate` tạo namespace `data`, `fcourt-prod` và các Secret từ `~/.fcourt/secrets/<secret>.env` (xem `scripts/secrets.example/`). Giá trị ngẫu nhiên được tự sinh; PayOS và SMTP phải điền trước.
+3. `export GITOPS_REPO_USERNAME=... GITOPS_REPO_TOKEN=...` (PAT fine-grained, Contents read-only) rồi `bash scripts/bootstrap-argocd.sh`: cài Argo CD chart `10.13.1`, lưu credential repo, hạ StorageClass `gp2` và apply `argocd/root-app.yaml`.
+4. Theo dõi `kubectl -n argocd get applications`.
 
-```text
-client -> ALB (group fcourt-public, HTTP 80) -> gateway-service:8080 -> Eureka lookup (lb://<name>) -> pod IP of the target service
-```
+Còn phải chọn: `NOTIFICATION_SMTP_HOST`, `NOTIFICATION_RESET_PASSWORD_URL` (đang `<SET_...>`), `PAYOS_RETURN_URL`, `PAYOS_CANCEL_URL` (đang rỗng); `SUBSCRIPTION_BASE_URL` và `DISCOVERY_BASE_URL` của facility-service đang rỗng.
 
-`gateway-service` owns the only Ingress (path `/`, Prefix). It checks the JWT (JWKS from `auth-service`, same `AUTH_JWK_SET_URI`, `AUTH_JWT_ISSUER` and `AUTH_JWT_AUDIENCE` as the other services), then routes by path through Eureka `lb://` to the target service. Every other service is ClusterIP-only and is never reachable from outside the cluster. `eureka-server` (port 8761, one replica) is ClusterIP too; open its dashboard with `kubectl -n fcourt-dev port-forward svc/eureka-server 8761:8761`. All services register with `EUREKA_URL=http://eureka-server:8761/eureka`, `EUREKA_ENABLED=true` and `EUREKA_INSTANCE_PREFER_IP_ADDRESS=true` (pod IP, because pod hostnames do not resolve). The aggregated Swagger UI is served by the gateway at `/swagger-ui`.
-
-The table below is the routing reference the gateway implements (it was the per-service Ingress table before the gateway). Paths come from the controller mappings in `fcourt-backend` plus `/devices`. Never routed: `/api/internal/**` (service-to-service), `/actuator/**` on other services (the ALB only health-checks the gateway's own `/actuator/health`), `/.well-known/jwks.json` (consumed by services inside the cluster), and the slot-hold-engine gRPC server.
-
-
-| Path | Service | Port |
-|---|---|---|
-| `/api/auth` (also `/api/auth/me`, `/profile`, `/password`) | auth-service | 8081 |
-| `/api/super-admin/court-admins`, `/api/super-admin/users`, `/api/super-admin/stats/accounts`, `/api/super-admin/stats/owner-names` | auth-service | 8081 |
-| `/api/subscriptions`, `/api/subscription-plans`, `/api/court-types`, `/api/super-admin/stats/saas-revenue` | subscription-service | 8082 |
-| `/api/public/branches/*` (branch detail, `/images`, `/courts`), `/api/admin/branches`, `/api/admin/courts`, `/api/admin/time-slot-templates`, `/api/staff/branches`, `/api/staff/courts` | facility-service | 8083 |
-| `/api/admin/dashboard`, `/api/super-admin/dashboard` | reporting-service | 8084 |
-| `/api/public/branches` (exact, list), `/api/public/branches/*/reviews`, `/api/public/courts`, `/api/reviews`, `/api/admin/reviews` | discovery-service | 8085 |
-| `/api/vouchers`, `/api/admin/vouchers` | voucher-service | 8086 |
-| `/api/bookings/hold-slots` (REST only; gRPC stays private) | slot-hold-engine | 8087 |
-| `/api/bookings`, `/api/admin/bookings`, `/ws-fcourt` (WebSocket/STOMP) | booking-service | 8088 |
-| `/api/payments`, `/api/refunds`, `/api/admin/payments`, `/api/admin/refunds` | payment-service | 8089 |
-| `/api/staff/schedule`, `/api/staff/check-in`, `/api/staff/offline`, `/api/staff/me`, `/api/staff/walk-in`, `/api/staff/bookings`, `/api/admin/staff` | staff-operations-service | 8090 |
-| `/devices` | notification-service | 8091 |
-| `/api/staff/pos`, `/api/admin/pos` | pos-retail-service | 8092 |
-
-### Path precedence
-
-Spring Cloud Gateway evaluates routes in `order` and takes the first match, not the longest prefix, so the gateway routes must keep the same precedence the ALB groups had. Two overlaps exist:
-
-- `/api/bookings` (booking-service) contains `/api/bookings/hold-slots` (slot-hold-engine). The hold-slots route must come first.
-- `/api/public/branches/*` (facility-service) contains `/api/public/branches/{id}/reviews` (discovery-service), and discovery also owns the exact list path `/api/public/branches`. The discovery routes must come first; the facility wildcard does not match the bare list path.
-
-Everything else is disjoint on purpose: `/api/admin/*`, `/api/staff/*` and `/api/super-admin/*` are split by the second segment (for example `/api/admin/branches` vs `/api/admin/dashboard`), so no broad `/api/admin` or `/api/staff` prefix is used. Keep new paths specific.
-
-The ALB now has a single rule (`/` to the gateway), far below its 100-rule default limit.
-
-### WebSocket (`/ws-fcourt`)
-
-booking-service serves STOMP over plain WebSocket (no SockJS fallback, so sticky sessions are not needed; slot updates fan out through Redis pub/sub). The gateway must route `/ws-fcourt` to `lb:ws://booking-service` (WebSocket upgrade through Spring Cloud Gateway). The ALB upgrades WebSocket connections on its HTTP listeners without extra annotations. The gateway Ingress sets `load-balancer-attributes: idle_timeout.timeout_seconds=3600` (default is 60 s, and the server sends no heartbeats) and `target-group-attributes: deregistration_delay.timeout_seconds=60` to let sockets drain on rollouts. Clients should still reconnect on close.
-
-### Assumptions
-
-- `pos-retail-service` and `notification-service` both default to `8091` in code. The POS manifest sets `SERVER_PORT` to `8092` to avoid the clash.
-- Secrets are referenced by name only. In dev they are created by `scripts/create-dev-secrets.sh` (see below); External Secrets is installed as an operator but has no store yet.
-- Confirm that the Actuator health endpoint is present in the built images.
-- Chart versions are pinned but not tested against the clusters. See `platform/README.md`.
-
-## Local validation
+## Kiểm tra cục bộ
 
 ```sh
 bash scripts/validate.sh
 ```
 
-Renders every Kustomize entry point (bootstrap, clusters, platform, every service overlay) with `kustomize` or `kubectl kustomize`. No cluster or AWS access is needed.
+Render mọi entry point Kustomize (argocd, platform, từng service) bằng `kustomize` hoặc `kubectl kustomize`, và đếm Deployment (kỳ vọng 13). Không cần cluster hay AWS.
 
-## Dev bring-up (after `terraform apply` of `fcourt-infra/envs/dev`)
+## Gateway routes
 
-Run from this repo with `AWS_PROFILE=tpn12`, `kubectl` pointed at the new cluster (`aws eks update-kubeconfig --name fcourt-dev`), `helm` and `terraform` installed.
+Gateway sở hữu Ingress duy nhất (path `/`). Tham chiếu route (từ controller trong `fcourt-backend`, cộng `/devices`); không route `/api/internal/**`, `/actuator/**` của service khác, `/.well-known/jwks.json`, gRPC của slot-hold-engine.
 
-1. `bash scripts/apply-terraform-outputs.sh` writes the two values only known after apply (VPC id for the AWS Load Balancer Controller, SNS platform application ARN for notification-service) and pushes them to `main`. The controller cannot discover the VPC itself because the node launch template sets IMDS hop limit 1.
-2. `bash scripts/create-dev-secrets.sh --generate` creates namespaces `data` and `fcourt-dev` and every Secret from `~/.fcourt/dev-secrets/<secret>.env` (see `scripts/dev-secrets.example/` for the keys; those files hold keys only). Random values (JWT/gRPC keys, internal tokens, Postgres password) are generated; Cloudinary, PayOS (including `PAYOS_CHECKSUM_KEY`) and SMTP values must be put in the files first. `fcourt-postgres-superuser` is created in `data` (used by CloudNativePG through `superuserSecret`) and copied to `fcourt-dev` (used by the services).
-3. `export GITOPS_REPO_USERNAME=... GITOPS_REPO_TOKEN=...` (fine-grained PAT, Contents read-only on `fcourt-gitops`; never committed), then `bash scripts/bootstrap-argocd.sh`. It installs Argo CD chart `10.13.1` (dex and notifications off, small resources, `argocd/values.yaml`), stores the repo credential as a Secret, demotes the `gp2` default StorageClass and applies the root Application.
-4. Watch `kubectl -n argocd get applications`. `platform/storage` creates the default `gp3` StorageClass (EBS CSI, `reclaimPolicy: Delete`); the EBS CSI add-on and its Pod Identity role come from `fcourt-infra/modules/eks`.
+| Path | Service | Port |
+|---|---|---|
+| `/api/auth`, `/api/super-admin/court-admins`, `/api/super-admin/users`, `/api/super-admin/stats/accounts`, `/api/super-admin/stats/owner-names` | auth-service | 8081 |
+| `/api/subscriptions`, `/api/subscription-plans`, `/api/court-types`, `/api/super-admin/stats/saas-revenue` | subscription-service | 8082 |
+| `/api/public/branches/*` (chi tiết, `/images`, `/courts`), `/api/admin/branches`, `/api/admin/courts`, `/api/admin/time-slot-templates`, `/api/staff/branches`, `/api/staff/courts` | facility-service | 8083 |
+| `/api/admin/dashboard`, `/api/super-admin/dashboard` | reporting-service | 8084 |
+| `/api/public/branches` (list), `/api/public/branches/*/reviews`, `/api/public/courts`, `/api/reviews`, `/api/admin/reviews` | discovery-service | 8085 |
+| `/api/vouchers`, `/api/admin/vouchers` | voucher-service | 8086 |
+| `/api/bookings/hold-slots` | slot-hold-engine | 8087 |
+| `/api/bookings`, `/api/admin/bookings`, `/ws-fcourt` (WebSocket/STOMP) | booking-service | 8088 |
+| `/api/payments`, `/api/refunds`, `/api/admin/payments`, `/api/admin/refunds` | payment-service | 8089 |
+| `/api/staff/schedule`, `/check-in`, `/offline`, `/me`, `/walk-in`, `/bookings`, `/api/admin/staff` | staff-operations-service | 8090 |
+| `/devices` | notification-service | 8091 |
+| `/api/staff/pos`, `/api/admin/pos` | pos-retail-service | 8092 |
 
-Values still to be chosen by the owner before services are healthy: `NOTIFICATION_SMTP_HOST` and `NOTIFICATION_RESET_PASSWORD_URL` in `services/notification-service/base/configmap.yaml` (left as `<SET_...>`), `PAYOS_RETURN_URL` and `PAYOS_CANCEL_URL` (empty). Service-to-service URLs use short in-namespace names (`http://auth-service:8081`), and `AUTH_JWT_ISSUER` is the string `http://auth-service:8081` for every service (it only has to be identical everywhere). Service pods request 448Mi (limit 768Mi), start with a 5-minute `startupProbe` and `JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60`.
-
-### Dev memory budget (2 x t3.large, about 13.9 GiB allocatable)
-
-Requests set in Git: 12 services x 448Mi + `eureka-server` 384Mi + `gateway-service` 448Mi = 6208Mi; PostgreSQL 512Mi, Kafka 512Mi, Redis 96Mi = 1120Mi; Argo CD (controller, server, repo-server, redis) 480Mi. That is 7808Mi (about 7.6 GiB). Add roughly 1.4 GiB for pods without a request (operators, entity operator, External Secrets, ALB controller, metrics-server, kube-system) and the scheduler sees about 9.0 GiB of 13.9 GiB. Actual use is higher than requests (JVMs run at 450-600Mi), roughly 11.5-13.5 GiB, so watch `kubectl top nodes` and keep the node count at 2 or more.
+Thứ tự ưu tiên: Spring Cloud Gateway lấy route khớp đầu tiên, nên `/api/bookings/hold-slots` phải đứng trước `/api/bookings`, và các route reviews/list của discovery phải đứng trước wildcard `/api/public/branches/*` của facility. `/ws-fcourt` cần WebSocket upgrade tới booking-service; Ingress đặt `idle_timeout.timeout_seconds=3600` và `deregistration_delay.timeout_seconds=60`. `pos-retail-service` dùng 8092 để tránh trùng 8091 của notification-service.

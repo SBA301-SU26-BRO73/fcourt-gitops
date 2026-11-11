@@ -1,9 +1,9 @@
-# Minimal Argo CD for a 2-node dev cluster. Chart version is pinned in scripts/bootstrap-argocd.sh.
+# Minimal Argo CD for the 2-node fcourt-prod cluster. Chart version is pinned in scripts/bootstrap-argocd.sh.
 global:
   domain: ""
 configs:
   params:
-    server.insecure: true # no TLS/ingress in dev; reach it with kubectl port-forward
+    server.insecure: true # no TLS/ingress; reach it with kubectl port-forward
 dex:
   enabled: false
 notifications:
