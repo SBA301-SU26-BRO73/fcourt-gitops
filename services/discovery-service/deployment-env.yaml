@@ -13,8 +13,3 @@ spec:
                 secretKeyRef:
                   name: discovery-service-secrets
                   key: DISCOVERY_DB_PASSWORD
-            - name: DISCOVERY_INTERNAL_SLOT_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: discovery-service-secrets
-                  key: DISCOVERY_INTERNAL_SLOT_TOKEN

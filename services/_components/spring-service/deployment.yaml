@@ -22,7 +22,8 @@ spec:
       containers:
         - name: spring-service
           image: spring-service
-          imagePullPolicy: IfNotPresent
+          # Tags are mutable (latest), so pull on every start; a restart then picks up the image CD just pushed.
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 8080
@@ -30,6 +31,10 @@ spec:
           envFrom:
             - configMapRef:
                 name: spring-service-config
+            # Shared service-to-service tokens (same values in every service, like compose). Optional so a missing secret does not block startup.
+            - secretRef:
+                name: fcourt-internal-tokens
+                optional: true
           env:
             # Default JVM heap is 25% of the container limit (about 192 MiB); give it 55% and keep other JVM memory areas small.
             - name: JAVA_TOOL_OPTIONS

@@ -13,13 +13,3 @@ spec:
                 secretKeyRef:
                   name: fcourt-postgres-superuser
                   key: password
-            - name: POS_BOOKING_SERVICE_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: pos-retail-service-secrets
-                  key: POS_BOOKING_SERVICE_TOKEN
-            - name: POS_SETTLEMENT_SERVICE_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: pos-retail-service-secrets
-                  key: POS_SETTLEMENT_SERVICE_TOKEN

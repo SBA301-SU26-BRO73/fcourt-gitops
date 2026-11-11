@@ -13,13 +13,3 @@ spec:
                 secretKeyRef:
                   name: facility-service-secrets
                   key: FACILITY_DB_PASSWORD
-            - name: DISCOVERY_INTERNAL_SLOT_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: facility-service-secrets
-                  key: DISCOVERY_INTERNAL_SLOT_TOKEN
-            - name: FACILITY_RESERVATION_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: facility-service-secrets
-                  key: FACILITY_RESERVATION_TOKEN
