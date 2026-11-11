@@ -3,8 +3,14 @@ kind: Kustomization
 namespace: fcourt-prod
 # Single public entry point: the only Ingress in the cluster (ALB group fcourt-public).
 # Routes to services by Kubernetes Service DNS (http://<svc>:<port>) and checks the JWT.
-resources:
-- configmap.yaml
+configMapGenerator:
+- name: gateway-service-config
+  behavior: create
+  envs:
+  - config.env
+  options:
+    labels:
+      app.kubernetes.io/name: gateway-service
 components:
 - ../_components/spring-service
 - ../_components/alb-ingress
