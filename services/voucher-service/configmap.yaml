@@ -17,3 +17,4 @@ data:
   VOUCHER_GRPC_HOST: '127.0.0.1'
   VOUCHER_GRPC_PORT: '9086'
   VOUCHER_GRPC_CERTIFICATE: ''
+  BOOKING_URL: 'http://booking-service:8088'
