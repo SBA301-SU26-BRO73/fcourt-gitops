@@ -31,9 +31,9 @@ spec:
             - configMapRef:
                 name: spring-service-config
           env:
-            # Default JVM heap is 25% of the container limit (about 192 MiB); give it 60%.
+            # Default JVM heap is 25% of the container limit (about 192 MiB); give it 55% and keep other JVM memory areas small.
             - name: JAVA_TOOL_OPTIONS
-              value: "-XX:MaxRAMPercentage=60"
+              value: "-XX:MaxRAMPercentage=55 -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Xss512k -XX:ReservedCodeCacheSize=64m -XX:MaxMetaspaceSize=192m"
           # JVM start on 2 vCPU with 12 services booting together can take minutes:
           # up to 5 s x 60 = 5 minutes before liveness takes over.
           startupProbe:
