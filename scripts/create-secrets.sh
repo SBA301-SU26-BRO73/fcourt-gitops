@@ -49,7 +49,7 @@ if $generate; then
   ensure fcourt-internal-tokens FACILITY_RESERVATION_TOKEN reuse facility-service-secrets FACILITY_RESERVATION_TOKEN
   ensure fcourt-internal-tokens POS_BOOKING_SERVICE_TOKEN reuse pos-retail-service-secrets POS_BOOKING_SERVICE_TOKEN
   ensure fcourt-internal-tokens POS_SETTLEMENT_SERVICE_TOKEN reuse pos-retail-service-secrets POS_SETTLEMENT_SERVICE_TOKEN
-  for key in BOOKING_HOLD_SERVICE_TOKEN BOOKING_INTEGRATION_TOKEN PAYMENT_BOOKING_SERVICE_TOKEN STAFF_BOOKING_SERVICE_TOKEN STAFF_OFFLINE_SIGNING_KEY; do
+  for key in BOOKING_HOLD_SERVICE_TOKEN BOOKING_INTEGRATION_TOKEN PAYMENT_BOOKING_SERVICE_TOKEN STAFF_BOOKING_SERVICE_TOKEN STAFF_DIRECTORY_TOKEN STAFF_OFFLINE_SIGNING_KEY; do
     ensure fcourt-internal-tokens "$key" rand
   done
   ensure auth-service-secrets AUTH_JWT_PRIVATE_KEY pem
