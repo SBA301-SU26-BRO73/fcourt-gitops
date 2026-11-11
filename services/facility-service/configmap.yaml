@@ -15,7 +15,8 @@ data:
   AUTH_JWK_SET_URI: 'http://auth-service:8081/.well-known/jwks.json'
   AUTH_JWT_ISSUER: 'http://auth-service:8081'
   AUTH_JWT_AUDIENCE: 'fcourt'
-  SUBSCRIPTION_BASE_URL: 'http://subscription-service:8082'
+  # subscription-service has no /api/internal/subscriptions/admins/{id}/limits yet; empty = default limits below.
+  SUBSCRIPTION_BASE_URL: ''
   SUBSCRIPTION_DEFAULT_MAX_BRANCHES: '3'
   SUBSCRIPTION_DEFAULT_MAX_COURTS: '15'
   FACILITY_IMAGES_MAX_PER_BRANCH: '10'
