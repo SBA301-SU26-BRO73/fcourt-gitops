@@ -1,0 +1,61 @@
+# Two AppProjects: `platform` (cluster add-ons and in-cluster data) and `services` (the FCourt apps, fcourt-prod only).
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '-1'
+spec:
+  description: FCourt cluster add-ons and in-cluster data managed from the GitOps repository
+  sourceRepos:
+    - https://github.com/SBA301-SU26-BRO73/fcourt-gitops.git
+    - https://aws.github.io/eks-charts
+    - https://cloudnative-pg.github.io/charts
+    - https://strimzi.io/charts/
+  destinations:
+    - namespace: kube-system
+      server: https://kubernetes.default.svc
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+    - namespace: data
+      server: https://kubernetes.default.svc
+    - namespace: cnpg-system
+      server: https://kubernetes.default.svc
+    - namespace: strimzi-system
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+    - group: apiregistration.k8s.io
+      kind: APIService
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: services
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '-1'
+spec:
+  description: FCourt application services (namespace fcourt-prod)
+  sourceRepos:
+    - https://github.com/SBA301-SU26-BRO73/fcourt-gitops.git
+  destinations:
+    - namespace: fcourt-prod
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'

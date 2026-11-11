@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-service-config
+  labels:
+    app.kubernetes.io/name: payment-service
+data:
+  SERVER_PORT: '8089'
+  DATABASE_URL: "jdbc:postgresql://fcourt-postgres-rw.data.svc.cluster.local:5432/payment_db"
+  DATABASE_USER: 'postgres'
+  REDIS_HOST: "redis.data.svc.cluster.local"
+  REDIS_PORT: '6379'
+  KAFKA_BOOTSTRAP_SERVERS: "fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092"
+  AUTH_JWK_SET_URI: 'http://auth-service:8081/.well-known/jwks.json'
+  AUTH_JWT_ISSUER: 'http://auth-service:8081'
+  AUTH_JWT_AUDIENCE: 'fcourt'
+  PAYMENT_EVENTS_ENABLED: 'true'
+  BOOKING_URL: 'http://booking-service:8088'
+  FACILITY_URL: 'http://facility-service:8083'
+  AUTH_URL: 'http://auth-service:8081'
+  STORAGE_S3_BUCKET: 'fcourt-prod-media-870853685410'
+  STORAGE_S3_REGION: 'ap-southeast-1'
+  STORAGE_PUBLIC_BASE_URL: 'https://fcourt-prod-media-870853685410.s3.ap-southeast-1.amazonaws.com'

@@ -21,8 +21,8 @@ Ba repo cần quy ước chung cho tên service, tag image, biến môi trườn
 
 ## Root sync ordering
 
-Each cluster has one root Application (`bootstrap/dev/root-app.yaml`, `bootstrap/prod/root-app.yaml`) that manages `clusters/<env>`. That Kustomize entry point includes the AppProjects at sync-wave `-1`, the platform Application manifests directly at wave `0`, and the services ApplicationSet at wave `1`. Argo CD waits for the health of the wave 0 Application resources before advancing, so platform health gates creation of the services ApplicationSet. The platform Application resources live in namespace `argocd`; their chart destinations are workload namespaces such as `kube-system` and `external-secrets`. Root and child Applications use bounded retry backoff.
+The single root Application (`argocd/root-app.yaml`) manages the `argocd/` folder. That Kustomize entry point includes the AppProjects at sync-wave `-1`, the platform Application manifests at wave `0`, and the services ApplicationSet at wave `1`. Argo CD waits for the health of the wave 0 Application resources before advancing, so platform health gates creation of the services ApplicationSet. The platform Application resources live in namespace `argocd`; their chart destinations are workload namespaces such as `kube-system`. Root and child Applications use bounded retry backoff.
 
-In-cluster data components (CloudNativePG, Strimzi, Redis) are listed only in `clusters/dev`; prod uses managed AWS services provisioned by `fcourt-infra`.
+In-cluster data components (CloudNativePG, Strimzi, Redis) live in `platform/` and run in namespace `data`. There is one environment (`fcourt-prod`).
 
 This orders the resources the root directly manages. An ApplicationSet does not wait for the health of the Applications it generates, so service Applications may reconcile concurrently. Progressive syncs with RollingSync are a possible later option but are not enabled.

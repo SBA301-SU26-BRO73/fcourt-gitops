@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Installs Argo CD (pinned Helm chart, dex and notifications off), registers the private gitops repo with a
-# credential read from the environment, then applies the dev root Application. Run once per new cluster.
+# credential read from the environment, then applies the root Application. Run once per new cluster.
 #
 #   export GITOPS_REPO_USERNAME=<github user>   # any non-empty value works for a fine-grained token
 #   export GITOPS_REPO_TOKEN=<fine-grained PAT, Contents read-only, repo fcourt-gitops only>
@@ -34,6 +34,6 @@ if kubectl get sc gp2 >/dev/null 2>&1; then
   kubectl patch sc gp2 -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
 fi
 
-kubectl apply -n argocd -f "$root_dir/bootstrap/dev/root-app.yaml"
+kubectl apply -n argocd -f "$root_dir/argocd/root-app.yaml"
 echo "Argo CD installed. UI: kubectl -n argocd port-forward svc/argocd-server 8080:80"
 echo "Admin password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath={.data.password} | base64 -d"
