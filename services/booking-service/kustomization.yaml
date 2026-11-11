@@ -2,25 +2,25 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: fcourt-prod
 resources:
-  - configmap.yaml
+- configmap.yaml
 components:
-  - ../_components/spring-service
+- ../_components/spring-service
 images:
-  - name: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/booking-service
-    newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/booking-service
-    newTag: latest
-patches:
-  - path: deployment-env.yaml
-  - target:
-      kind: Service
-    patch: |-
-      - op: add
-        path: /spec/ports/-
-        value: {name: grpc, port: 9088, targetPort: 9088, protocol: TCP}
+- name: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/booking-service
+  newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/booking-service
+  newTag: 7be5529
   # Point the container at the ECR image so CI can run: kustomize edit set image <repo>=<repo>:<tag>
-  - target:
-      kind: Deployment
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/image
-        value: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/booking-service
+patches:
+- path: deployment-env.yaml
+- patch: |-
+    - op: add
+      path: /spec/ports/-
+      value: {name: grpc, port: 9088, targetPort: 9088, protocol: TCP}
+  target:
+    kind: Service
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/image
+      value: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/booking-service
+  target:
+    kind: Deployment
