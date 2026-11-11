@@ -13,7 +13,7 @@ data:
   AUTH_JWK_SET_URI: 'http://auth-service:8081/.well-known/jwks.json'
   AUTH_JWT_ISSUER: 'http://auth-service:8081'
   AUTH_JWT_AUDIENCE: 'fcourt'
-  VOUCHER_GRPC_ENABLED: 'true'
+  VOUCHER_GRPC_ENABLED: 'false'
   VOUCHER_GRPC_HOST: '127.0.0.1'
   VOUCHER_GRPC_PORT: '9086'
   VOUCHER_GRPC_CERTIFICATE: ''
