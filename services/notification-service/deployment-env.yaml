@@ -18,8 +18,10 @@ spec:
                 secretKeyRef:
                   name: notification-service-secrets
                   key: NOTIFICATION_SMTP_USER
+                  optional: true
             - name: NOTIFICATION_SMTP_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: notification-service-secrets
                   key: NOTIFICATION_SMTP_PASSWORD
+                  optional: true
