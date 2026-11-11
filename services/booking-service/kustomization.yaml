@@ -8,7 +8,7 @@ components:
 images:
   - name: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/booking-service
     newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/booking-service
-    newTag: dev
+    newTag: latest
 patches:
   - path: deployment-env.yaml
   - target:

@@ -11,7 +11,7 @@ components:
 images:
   - name: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/gateway-service
     newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/gateway-service
-    newTag: dev
+    newTag: latest
 patches:
   - target:
       kind: Ingress

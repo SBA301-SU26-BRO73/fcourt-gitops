@@ -84,7 +84,7 @@ kubectl -n data port-forward svc/fcourt-kafka-kafka-bootstrap 9092:9092
 
 ## Cập nhật image
 
-CI của fcourt-backend (`build-push-images.yml`) push `:<short-sha>` và `:dev`, rồi chạy `kustomize edit set image <repo>=<repo>:<short-sha>` trong `services/<svc>` và commit vào `main`; Argo CD sync commit mới. Không dùng `latest`.
+CI của fcourt-backend (`build-push-images.yml`) push `:<short-sha>` và `:latest`, rồi chạy `kustomize edit set image <repo>=<repo>:<short-sha>` trong `services/<svc>` và commit vào `main`; Argo CD sync commit mới. Gitops luôn ghim tag SHA; `latest` chỉ là giá trị khởi tạo trước lần build đầu tiên.
 
 ## Bring-up (sau `terraform apply` của `fcourt-infra/envs/prod`)
 
