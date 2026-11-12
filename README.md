@@ -1,131 +1,89 @@
-# FCourt GitOps
+# fcourt-gitops
 
-Cấu hình Kubernetes mà Argo CD đồng bộ vào cluster EKS `fcourt-prod` (một môi trường duy nhất). Gồm 12 Spring Boot service và `gateway-service` (điểm vào công khai duy nhất), cùng các add-on nền tảng: AWS Load Balancer Controller, StorageClass gp3, PostgreSQL (CloudNativePG), Kafka (Strimzi), Redis. Dùng Kustomize; Helm chart được cài bởi Argo CD Application với version cố định. Không có Eureka: service gọi nhau qua Kubernetes Service DNS.
+Kubernetes configuration that Argo CD syncs into the `fcourt-prod` EKS cluster (a single environment). It holds the manifests of the FCourt backend services and the in-cluster platform add-ons. Application code lives in `fcourt-backend`; AWS resources live in `fcourt-infra`. This repo is the source of truth for what runs in the cluster, including the image tag of each service. No real secrets are stored here.
 
-Phân chia repo (xem `docs/adr/0001-three-repositories.md`): repo backend giữ code và CI image; `fcourt-infra` (Terraform, root `envs/prod`) tạo EKS, VPC, IAM, Pod Identity, S3 và SNS; repo này giữ manifest và image tag của từng service. Không lưu secret thật trong Git.
+## Role in the FCourt system
 
-## Cấu trúc
+| Repo | Responsibility |
+|---|---|
+| `fcourt-backend` | Spring Boot microservices and the CI that builds and pushes images, then commits new image tags here |
+| **fcourt-gitops** (this repo) | Argo CD apps, platform add-ons, per-service Kustomize config |
+| `fcourt-infra` | Terraform: VPC, EKS, ECR, S3, CloudFront, Route 53, ACM, SNS, IAM Pod Identity, budget |
+| `fcourt-web` | Web frontend on S3 + CloudFront (https://fcourt.donan.site) |
+| `fcourt-flutter` | Android app |
+
+Why three repos: [docs/architecture/adr/0001-three-repositories.md](docs/architecture/adr/0001-three-repositories.md).
+
+## Tech stack
+
+Argo CD (Helm chart pinned in `scripts/bootstrap-argocd.sh`), Kustomize, ApplicationSet. Platform add-ons: AWS Load Balancer Controller, gp3 StorageClass, PostgreSQL (CloudNativePG), Kafka (Strimzi), Redis. Services: 12 Spring Boot services plus `gateway-service`, which is the only public entry point (ALB Ingress). Services call each other through Kubernetes Service DNS.
+
+## Project structure
 
 ```text
 argocd/
-  values.yaml              # Helm values cho Argo CD
-  root-app.yaml            # Application gốc duy nhất (path: argocd), apply tay một lần
-  kustomization.yaml       # nội dung root app: projects, platform, services ApplicationSet
-  projects.yaml            # AppProject platform + services
-  services-appset.yaml     # ApplicationSet: một App cho mỗi services/*
+  root-app.yaml            # single root Application (path: argocd), applied by hand once
+  kustomization.yaml       # root app content: projects, platform, services ApplicationSet
+  projects.yaml            # AppProjects: platform, services
+  services-appset.yaml     # ApplicationSet: one Application per services/*
+  values.yaml              # Helm values for Argo CD
 platform/
-  aws-load-balancer-controller/   # Helm chart qua Application
-  storage/                        # StorageClass gp3 (mặc định)
-  postgres/                       # operator + cluster CloudNativePG (manifests/)
-  kafka/                          # operator + Kafka + topics Strimzi (manifests/)
-  redis/                          # Redis (manifests/)
+  aws-load-balancer-controller/  storage/  postgres/  kafka/  redis/
 services/
-  _components/spring-service/     # Deployment, Service, ServiceAccount dùng chung
-  _components/alb-ingress/        # Ingress ALB công khai (chỉ gateway dùng)
-  <service>/                      # kustomization.yaml, config.env, deployment-env.yaml (nếu có secret)
-scripts/                          # bootstrap-argocd.sh, create-secrets.sh, apply-terraform-outputs.sh, validate.sh, secrets.example/
-docs/adr/                         # quyết định kiến trúc
+  _components/spring-service/    # shared Deployment, Service, ServiceAccount
+  _components/alb-ingress/       # public ALB Ingress (gateway only)
+  <service>/                     # kustomization.yaml, config.env, deployment-env.yaml (if secrets)
+scripts/                         # bootstrap, secrets, Terraform outputs, validate, secrets.example/
+docs/                            # see docs/README.md
 ```
 
-## Luồng Argo CD
+## How it works
 
 ```text
-scripts/bootstrap-argocd.sh  -->  argocd/root-app.yaml  (Application fcourt-root, path argocd)
-                                       |
-                                       |- wave -1  AppProjects (platform, services), StorageClass gp3
-                                       |- wave  0  operator + hạ tầng:
-                                       |           aws-load-balancer-controller, cloudnative-pg-operator,
-                                       |           strimzi-operator, redis
-                                       |- wave  1  CR của operator: cloudnative-pg (Cluster), strimzi (Kafka)
-                                       '- wave  2  ApplicationSet fcourt-services
-                                                   --> Application fcourt-<svc> cho mỗi services/* (trừ _components)
-                                                       namespace fcourt-prod, automated prune + selfHeal
+scripts/bootstrap-argocd.sh --> argocd/root-app.yaml (Application fcourt-root, path argocd)
+  wave -1  AppProjects, StorageClass gp3
+  wave  0  aws-load-balancer-controller, cloudnative-pg-operator, strimzi-operator, redis
+  wave  1  cloudnative-pg (Cluster), strimzi (Kafka)
+  wave  2  ApplicationSet fcourt-services --> Application fcourt-<svc> per services/*
+           (namespace fcourt-prod, automated prune and selfHeal)
 ```
 
-Mỗi wave chỉ bắt đầu khi wave trước healthy (Argo CD có health check Lua cho Application, cấu hình trong `argocd/values.yaml`). Hai App CR (wave 1) retry không giới hạn (backoff tối đa 3m) trong lúc CRD/operator còn khởi động. Các App con sau đó reconcile song song; service tự retry kết nối DB/Kafka. Root và các App còn lại có retry backoff giới hạn. Instance CloudNativePG/Strimzi dùng `SkipDryRunOnMissingResource=true` để CR được chấp nhận trước khi CRD của operator tồn tại.
+Runtime: `client -> ALB -> gateway-service:8080 -> http://<svc>:<port>`. Services use PostgreSQL, Kafka and Redis in namespace `data`, and reach S3 and SNS through EKS Pod Identity (ServiceAccount name = service name; the associations are created by `fcourt-infra`). More detail: [docs/architecture](docs/architecture/) and [docs/operations](docs/operations/).
 
-## Luồng runtime
+## Prerequisites
 
-```text
-client --> ALB (group fcourt-public, HTTP 80) --> gateway-service:8080 --http://<svc>:<port>--> các service (ClusterIP)
+`kubectl` pointed at the cluster, `helm`, `terraform`, `jq`, and AWS credentials with access to the cluster. For local rendering only `kustomize` or `kubectl` is needed (no cluster, no AWS).
 
-service --> PostgreSQL  fcourt-postgres-rw.data.svc.cluster.local:5432            (CloudNativePG, ns data)
-        |-> Kafka       fcourt-kafka-kafka-bootstrap.data.svc.cluster.local:9092  (Strimzi, ns data)
-        |-> Redis       redis.data.svc.cluster.local:6379
-        '-> S3 (media bucket) và SNS (push) qua EKS Pod Identity, ServiceAccount = tên service
-```
+## Common tasks
 
-- Gateway kiểm tra JWT (JWKS từ `auth-service`) rồi route theo path tới `http://<svc>:<port>` (instance tĩnh cấu hình trong backend). Mọi service khác chỉ là ClusterIP.
-- Pod Identity association do `fcourt-infra` tạo; ServiceAccount có cùng tên với service (từ `_components/spring-service`).
-- S3: `auth`, `discovery`, `facility`, `booking`, `payment` có `STORAGE_S3_BUCKET`, `STORAGE_S3_REGION`, `STORAGE_PUBLIC_BASE_URL` (bucket `fcourt-prod-media-870853685410`).
-- PostgreSQL tạo 11 database; service kết nối bằng user `postgres`, mật khẩu từ Secret `fcourt-postgres-superuser` (key `password`). Redis dùng `emptyDir`, không mật khẩu. Kafka plain nội bộ, topic khai báo bằng `KafkaTopic` trong `platform/kafka/manifests/topics.yaml`. Không HA, không backup.
+| Task | Command or place |
+|---|---|
+| Validate all manifests locally | `bash scripts/validate.sh` (renders every Kustomize entry point, expects 13 Deployments) |
+| Bring up a fresh cluster | after `terraform apply` of `fcourt-infra/envs/prod`: `scripts/apply-terraform-outputs.sh`, `scripts/create-secrets.sh --generate`, `scripts/bootstrap-argocd.sh`; full runbook in [docs/operations/bring-up.md](docs/operations/bring-up.md) |
+| Watch sync | `kubectl -n argocd get applications` |
+| Open Argo CD UI | `kubectl -n argocd port-forward svc/argocd-server 8080:80` |
+| Add a service | [docs/operations/service-layout.md](docs/operations/service-layout.md) |
+| Gateway paths per service | [docs/architecture/gateway-routes.md](docs/architecture/gateway-routes.md) |
 
-Debug:
+## Configuration
 
-```sh
-kubectl -n data port-forward svc/fcourt-postgres-rw 5432:5432
-kubectl -n data port-forward svc/redis 6379:6379
-kubectl -n data port-forward svc/fcourt-kafka-kafka-bootstrap 9092:9092
-```
+- Per-service environment lives in `services/<svc>/config.env` (`KEY=VALUE`, no quotes). Kustomize hashes the ConfigMap name, so a changed value rolls the Deployment on the next sync.
+- Secrets are never committed. `scripts/create-secrets.sh` creates Kubernetes Secrets from local env files (templates in `scripts/secrets.example/`, real files under `~/.fcourt/secrets/`). Service Deployments reference Secret `<svc>-secrets` through `deployment-env.yaml`.
+- Values derived from Terraform (VPC id, SNS ARN, S3 bucket and public base URL) are written by `scripts/apply-terraform-outputs.sh`.
 
-## Một service được dựng thế nào
+## CI/CD and deployment
 
-`services/_components/spring-service` chứa Deployment, Service, ServiceAccount dùng chung (non-root, root filesystem read-only, probe `/actuator/health`, resource, startupProbe 5 phút). Tên resource, `envFrom` và port được điền bằng Kustomize replacements từ ConfigMap của service (label `app.kubernetes.io/name`, `metadata.name`, `SERVER_PORT`). `services/<svc>/` chỉ chứa:
+- There is no CI workflow in this repo. Argo CD syncs `main` automatically.
+- Image updates: the `fcourt-backend` workflow `build-push-images.yml` pushes `:<short-sha>`, runs `kustomize edit set image` in `services/<svc>` and commits to `main`. Tags are always pinned to the SHA.
+- After a fresh bring-up, update the `origin` DNS record of the API (script `update-origin-record.sh` in `fcourt-infra`), because the ALB hostname changes on every up/down. See the runbook.
+- Run `bash scripts/validate.sh` before opening a PR.
 
-- `config.env`: các dòng `KEY=VALUE` (không thêm dấu nháy), gồm `SERVER_PORT` và biến môi trường Spring; chú thích nằm trên dòng riêng.
-- `deployment-env.yaml` (tuỳ chọn): các `env` tham chiếu Secret `<svc>-secrets`.
-- `kustomization.yaml`: namespace `fcourt-prod`, components, `configMapGenerator` tên logic `<svc>-config` (`behavior: create`, `envs: [config.env]`, label `app.kubernetes.io/name: <svc>`), mục `images:` cho `870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/<svc>` và một patch gắn image đó vào container để `kustomize edit set image` hoạt động.
+## Testing
 
-Kustomize thêm content hash vào tên ConfigMap và tự cập nhật `envFrom.configMapRef.name` qua component. Khi giá trị trong `config.env` thay đổi, pod template đổi nên Deployment tự rollout khi Argo CD sync. Không tắt name suffix hash. Kết quả so sánh cả 13 service: [configmap-rollout-verification.md](docs/configmap-rollout-verification.md). Đề xuất TLS cho lỗi staff walk-in A11: [a11-counter-grpc-tls-proposal.md](docs/a11-counter-grpc-tls-proposal.md).
+Manifests are validated by rendering: `bash scripts/validate.sh`. Verification notes for past changes: [docs/validation](docs/validation/).
 
-## Thêm một service
+## Contributing
 
-1. Tạo `services/<svc>/config.env` (port chưa dùng) và `kustomization.yaml` (copy từ service có sẵn, đổi tên generator, label và image).
-2. Cần secret thì thêm `deployment-env.yaml` và key vào `scripts/secrets.example/`.
-3. Thêm route và URL instance của service trong `gateway-service` ở fcourt-backend. Không thêm Ingress.
-4. `bash scripts/validate.sh`. ApplicationSet tự phát hiện `services/*`.
-
-## Cập nhật image
-
-CI của fcourt-backend (`build-push-images.yml`) push `:<short-sha>` và `:latest`, rồi chạy `kustomize edit set image <repo>=<repo>:<short-sha>` trong `services/<svc>` và commit vào `main`; Argo CD sync commit mới. Gitops luôn ghim tag SHA; `latest` chỉ là giá trị khởi tạo trước lần build đầu tiên.
-
-## Bring-up (sau `terraform apply` của `fcourt-infra/envs/prod`)
-
-Chạy từ repo này với `AWS_PROFILE=tpn12`, `kubectl` trỏ vào cluster (`aws eks update-kubeconfig --name fcourt-prod`), có `helm`, `terraform`, `jq`.
-
-1. `bash scripts/apply-terraform-outputs.sh` đọc output `gitops_values`, ghi VPC id (ALB controller), SNS ARN (notification-service), bucket và public base URL S3, rồi push lên `main`.
-2. `bash scripts/create-secrets.sh --generate` tạo namespace `data`, `fcourt-prod` và các Secret từ `~/.fcourt/secrets/<secret>.env` (xem `scripts/secrets.example/`). Giá trị ngẫu nhiên được tự sinh; PayOS và SMTP phải điền trước.
-3. `bash scripts/bootstrap-argocd.sh`: cài Argo CD chart `10.13.1`, hạ StorageClass `gp2`, apply `argocd/root-app.yaml`, rồi chờ Load Balancer Controller lên và chép CA từ secret `aws-load-balancer-tls` vào webhook (`scripts/fix-lb-webhook-ca.sh`; thiếu bước này Ingress sync lỗi x509). Repo public nên không cần token; nếu repo chuyển private thì `export GITOPS_REPO_TOKEN=...` (PAT fine-grained, Contents read-only) trước khi chạy.
-4. Theo dõi `kubectl -n argocd get applications`.
-5. Khi Ingress `gateway-service` đã có địa chỉ ALB, chạy `sh ../fcourt-infra/scripts/update-origin-record.sh` để cập nhật CNAME `origin.fcourt.donan.site` (origin API của CloudFront) trỏ vào ALB mới. ALB đổi hostname sau mỗi lần up/down nên bước này bắt buộc để `https://fcourt.donan.site/api` hoạt động.
-
-Còn phải chọn: `NOTIFICATION_SMTP_HOST`, `NOTIFICATION_RESET_PASSWORD_URL` (đang `<SET_...>`), `PAYOS_RETURN_URL`/`PAYOS_CANCEL_URL` đã trỏ `https://fcourt.donan.site/admin/subscriptions/payment-result` (không phải secret, nằm trong ConfigMap subscription-service); `SUBSCRIPTION_BASE_URL` và `DISCOVERY_BASE_URL` của facility-service đang rỗng.
-
-## Kiểm tra cục bộ
-
-```sh
-bash scripts/validate.sh
-```
-
-Render mọi entry point Kustomize (argocd, platform, từng service) bằng `kustomize` hoặc `kubectl kustomize`, và đếm Deployment (kỳ vọng 13). Không cần cluster hay AWS.
-
-## Gateway routes
-
-Gateway sở hữu Ingress duy nhất (path `/`). Tham chiếu route (từ controller trong `fcourt-backend`, cộng `/devices`); không route `/api/internal/**`, `/actuator/**` của service khác, `/.well-known/jwks.json`, gRPC của slot-hold-engine.
-
-| Path | Service | Port |
-|---|---|---|
-| `/api/auth`, `/api/super-admin/court-admins`, `/api/super-admin/users`, `/api/super-admin/stats/accounts`, `/api/super-admin/stats/owner-names` | auth-service | 8081 |
-| `/api/subscriptions`, `/api/subscription-plans`, `/api/court-types`, `/api/super-admin/stats/saas-revenue` | subscription-service | 8082 |
-| `/api/public/branches/*` (chi tiết, `/images`, `/courts`), `/api/admin/branches`, `/api/admin/courts`, `/api/admin/time-slot-templates`, `/api/staff/branches`, `/api/staff/courts` | facility-service | 8083 |
-| `/api/admin/dashboard`, `/api/super-admin/dashboard` | reporting-service | 8084 |
-| `/api/public/branches` (list), `/api/public/branches/*/reviews`, `/api/public/courts`, `/api/reviews`, `/api/admin/reviews` | discovery-service | 8085 |
-| `/api/vouchers`, `/api/admin/vouchers` | voucher-service | 8086 |
-| `/api/bookings/hold-slots` | slot-hold-engine | 8087 |
-| `/api/bookings`, `/api/admin/bookings`, `/ws-fcourt` (WebSocket/STOMP) | booking-service | 8088 |
-| `/api/payments`, `/api/refunds`, `/api/admin/payments`, `/api/admin/refunds` | payment-service | 8089 |
-| `/api/staff/schedule`, `/check-in`, `/offline`, `/me`, `/walk-in`, `/bookings`, `/api/admin/staff` | staff-operations-service | 8090 |
-| `/devices` | notification-service | 8091 |
-| `/api/staff/pos`, `/api/admin/pos` | pos-retail-service | 8092 |
-
-Thứ tự ưu tiên: Spring Cloud Gateway lấy route khớp đầu tiên, nên `/api/bookings/hold-slots` phải đứng trước `/api/bookings`, và các route reviews/list của discovery phải đứng trước wildcard `/api/public/branches/*` của facility. `/ws-fcourt` cần WebSocket upgrade tới booking-service; Ingress đặt `idle_timeout.timeout_seconds=3600` và `deregistration_delay.timeout_seconds=60`. `pos-retail-service` dùng 8092 để tránh trùng 8091 của notification-service.
+- Branch from `main` with a prefix such as `feat/`, `fix/`, `docs/`, `chore/`; open a PR into `main`.
+- Commit messages and PR titles are in English (`type(scope): message`, for example `chore(images): bump notification-service to <sha>`). Bodies may be Vietnamese.
+- Do not commit secrets, tokens or filled-in `.env` files. Do not disable the ConfigMap name suffix hash.

@@ -1,0 +1,4 @@
+# Report deliverables (DOCX/PDF) stay out of git; keep the folder and its README
+docs/report/*
+!docs/report/README.md
+!docs/report/.gitkeep
