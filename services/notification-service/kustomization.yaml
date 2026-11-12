@@ -2,10 +2,10 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: fcourt-prod
 configMapGenerator:
-- name: notification-service-config
-  behavior: create
+- behavior: create
   envs:
   - config.env
+  name: notification-service-config
   options:
     labels:
       app.kubernetes.io/name: notification-service
@@ -14,7 +14,7 @@ components:
 images:
 - name: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/notification-service
   newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/notification-service
-  newTag: 7be5529
+  newTag: e9390a3
   # Point the container at the ECR image so CI can run: kustomize edit set image <repo>=<repo>:<tag>
 patches:
 - path: deployment-env.yaml
