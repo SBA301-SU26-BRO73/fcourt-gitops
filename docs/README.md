@@ -1,13 +1,13 @@
-# fcourt-gitops docs
+# Tài liệu fcourt-gitops
 
-Most notes are in Vietnamese (moved from the old README).
+Phần lớn ghi chú viết bằng tiếng Việt (chuyển từ README cũ).
 
-| Folder | Content |
+| Thư mục | Nội dung |
 |---|---|
-| [architecture/](architecture/) | [ADR 0001: three repositories](architecture/adr/0001-three-repositories.md), [runtime flow](architecture/runtime-flow.md), [gateway routes](architecture/gateway-routes.md) |
-| [operations/](operations/) | [Bring-up runbook](operations/bring-up.md), [service layout, adding a service, image updates](operations/service-layout.md) |
-| [validation/](validation/) | [ConfigMap rollout verification](validation/configmap-rollout-verification.md) |
-| [proposals/](proposals/) | [A11 counter gRPC TLS proposal](proposals/a11-counter-grpc-tls-proposal.md) |
-| [report/](report/) | Local-only report deliverables (DOCX/PDF are git-ignored) |
+| [architecture/](architecture/) | [ADR 0001: ba repository](architecture/adr/0001-three-repositories.md), [luồng runtime](architecture/runtime-flow.md), [gateway routes](architecture/gateway-routes.md) |
+| [operations/](operations/) | [Runbook bring-up](operations/bring-up.md), [cấu trúc service, thêm service, cập nhật image](operations/service-layout.md) |
+| [validation/](validation/) | [Xác minh rollout ConfigMap](validation/configmap-rollout-verification.md) |
+| [proposals/](proposals/) | [Đề xuất gRPC TLS cho A11 counter](proposals/a11-counter-grpc-tls-proposal.md) |
+| [report/](report/) | Sản phẩm báo cáo chỉ lưu local (DOCX/PDF bị git-ignore) |
 
-The main README is [../README.md](../README.md).
+README chính là [../README.md](../README.md).
