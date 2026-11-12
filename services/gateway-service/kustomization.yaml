@@ -17,9 +17,10 @@ components:
 images:
 - name: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/gateway-service
   newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/gateway-service
-  newTag: ad3135a
+  newTag: 554a308
       # Let WebSocket (/ws-fcourt) connections drain on gateway rollouts.
   # Point the container at the ECR image so CI can run: kustomize edit set image <repo>=<repo>:<tag>
+    # Let WebSocket (/ws-fcourt) connections drain on gateway rollouts.
     # Let WebSocket (/ws-fcourt) connections drain on gateway rollouts.
 patches:
 - patch: |-
