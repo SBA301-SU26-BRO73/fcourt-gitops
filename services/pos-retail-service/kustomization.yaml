@@ -14,7 +14,7 @@ components:
 images:
 - name: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/pos-retail-service
   newName: 870853685410.dkr.ecr.ap-southeast-1.amazonaws.com/fcourt/pos-retail-service
-  newTag: 7be5529
+  newTag: rebuild-20261114
   # Point the container at the ECR image so CI can run: kustomize edit set image <repo>=<repo>:<tag>
 patches:
 - path: deployment-env.yaml

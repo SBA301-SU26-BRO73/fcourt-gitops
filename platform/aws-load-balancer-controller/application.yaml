@@ -16,7 +16,7 @@ spec:
         clusterName: fcourt-prod
         region: ap-southeast-1
         # Pods cannot reach IMDS (hop limit 1), so the chart cannot discover the VPC. scripts/apply-terraform-outputs.sh fills this after terraform apply.
-        vpcId: "vpc-0410683b8a84e66de"
+        vpcId: "vpc-0719b07c4160a1fe1"
         replicaCount: 1
         enableServiceMutatorWebhook: false
         serviceAccount:
